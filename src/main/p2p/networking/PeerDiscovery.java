@@ -75,15 +75,8 @@ public class PeerDiscovery {
 
                     if (receivedData.equals("P2P_DISCOVERY")) {
                         sendResponse(senderAddress, receivedPacket.getPort());
-                    } else if (receivedData.startsWith("P2P_RESPONSE")) {
+                    } else {
                         processResponse(receivedData, senderAddress);
-                    } else if (receivedData.equals("P2P_FINALIZED")) {
-                        System.out.println("Connection finalized with " + senderAddress);
-                        Peer finalizedPeer = new Peer("peer_id", senderAddress.getHostAddress(), DISCOVERY_PORT);
-                        if (discoveredPeers.add(finalizedPeer)) {
-                            model.addPeer(finalizedPeer);
-                            System.out.println("Peer added from finalized message: " + finalizedPeer);
-                        }
                     }
                 }
             } catch (Exception e) {
