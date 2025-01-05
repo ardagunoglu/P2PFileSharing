@@ -38,6 +38,12 @@ public class PeerDiscovery {
 
                 socket.send(packet);
                 System.out.println("Discovery message sent to broadcast address.");
+
+                byte[] buffer = new byte[1024];
+                DatagramPacket responsePacket = new DatagramPacket(buffer, buffer.length);
+                socket.receive(responsePacket);
+
+                processResponse(new String(responsePacket.getData(), 0, responsePacket.getLength()), responsePacket.getAddress());
             } catch (Exception e) {
                 System.err.println("Error sending discovery message: " + e.getMessage());
             }
@@ -71,10 +77,36 @@ public class PeerDiscovery {
                         sendResponse(senderAddress, receivedPacket.getPort());
                     } else if (receivedData.startsWith("P2P_RESPONSE")) {
                         processResponse(receivedData, senderAddress);
+                    } else if (receivedData.equals("P2P_FINALIZED")) {
+                        System.out.println("Connection finalized with " + senderAddress);
+                        Peer finalizedPeer = new Peer("peer_id", senderAddress.getHostAddress(), DISCOVERY_PORT);
+                        if (discoveredPeers.add(finalizedPeer)) {
+                            model.addPeer(finalizedPeer);
+                            System.out.println("Peer added from finalized message: " + finalizedPeer);
+                        }
                     }
                 }
             } catch (Exception e) {
                 System.err.println("Error in listener socket: " + e.getMessage());
+            }
+        }).start();
+    }
+
+
+    private void sendFinalizedMessage(String peerAddress, int peerPort) {
+        new Thread(() -> {
+            try (DatagramSocket socket = new DatagramSocket()) {
+                String finalizedMessage = "P2P_FINALIZED";
+                DatagramPacket packet = new DatagramPacket(
+                        finalizedMessage.getBytes(),
+                        finalizedMessage.length(),
+                        InetAddress.getByName(peerAddress),
+                        peerPort
+                );
+                socket.send(packet);
+                System.out.println("Finalized message sent to " + peerAddress + ":" + peerPort);
+            } catch (Exception e) {
+                System.err.println("Error sending finalized message: " + e.getMessage());
             }
         }).start();
     }
@@ -128,6 +160,8 @@ public class PeerDiscovery {
             if (discoveredPeers.add(peer)) {
                 model.addPeer(peer);
                 System.out.println("Discovered peer: " + peer);
+
+                sendFinalizedMessage(peerAddress, peerPort);
             }
         }
     }
