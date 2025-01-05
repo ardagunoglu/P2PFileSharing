@@ -2,6 +2,7 @@ package main.p2p.controller;
 
 import main.p2p.model.FileChunk;
 import main.p2p.model.P2PModel;
+import main.p2p.model.Peer;
 import main.p2p.networking.FileTransferManager;
 import main.p2p.networking.PeerDiscovery;
 import main.p2p.view.P2PView;
@@ -9,6 +10,7 @@ import main.p2p.view.P2PView;
 import javax.swing.*;
 import java.awt.*;
 import java.io.File;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -31,24 +33,34 @@ public class P2PController {
     }
 
     private void initializeListeners() {
-        view.getConnectMenuItem().addActionListener(e -> {
+    	view.getConnectMenuItem().addActionListener(e -> {
             model.setConnected(true);
             view.getConnectMenuItem().setEnabled(false);
             view.getDisconnectMenuItem().setEnabled(true);
 
-            executorService.submit(() -> {
-                try {
-                    peerDiscovery.discoverPeers();
-                    SwingUtilities.invokeLater(() -> {
-                        JOptionPane.showMessageDialog(view, "Connected to P2P network");
-                    });
-                } catch (Exception ex) {
-                    SwingUtilities.invokeLater(() -> {
-                        JOptionPane.showMessageDialog(view, "Failed to connect: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-                    });
-                }
-            });
+            try {
+                peerDiscovery.discoverPeers();
+
+                new Thread(() -> {
+                    try {
+                        while (model.isConnected()) {
+                            Set<Peer> peers = peerDiscovery.getDiscoveredPeers();
+                            model.setPeers(peers);
+                            SwingUtilities.invokeLater(() -> {
+                                view.getFoundFilesPanel().updatePeersList(peers);
+                            });
+                            Thread.sleep(5000);
+                        }
+                        peerDiscovery.stopDiscovery();
+                    } catch (Exception ex) {
+                        JOptionPane.showMessageDialog(view, "Error discovering peers: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                    }
+                }).start();
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(view, "Failed to connect: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            }
         });
+
 
         view.getDisconnectMenuItem().addActionListener(e -> {
             model.setConnected(false);
