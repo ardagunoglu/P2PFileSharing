@@ -9,36 +9,20 @@ import java.util.function.Consumer;
 
 public class FileTransferManager {
     private ServerSocket serverSocket;
-    private int listeningPort;
 
     public void startListening(int port, Consumer<FileChunk> onChunkReceived) {
         new Thread(() -> {
             try {
                 serverSocket = new ServerSocket(port);
-                listeningPort = port;
-                System.out.println("Listening on port: " + listeningPort);
-            } catch (IOException e) {
-                System.err.println("Port " + port + " is already in use. Trying a dynamic port...");
-                try {
-                    serverSocket = new ServerSocket(0);
-                    listeningPort = serverSocket.getLocalPort();
-                    System.out.println("Dynamic port assigned: " + listeningPort);
-                } catch (IOException ex) {
-                    System.err.println("Failed to bind to a dynamic port: " + ex.getMessage());
-                    return;
-                }
-            }
+                System.out.println("Listening for file transfers on port: " + port);
 
-            while (true) {
-                try {
+                while (true) {
                     Socket clientSocket = serverSocket.accept();
                     System.out.println("Connection accepted from: " + clientSocket.getInetAddress());
-
                     handleClient(clientSocket, onChunkReceived);
-                } catch (IOException e) {
-                    System.err.println("Error accepting connection: " + e.getMessage());
-                    break;
                 }
+            } catch (IOException e) {
+                System.err.println("Error starting file transfer listener: " + e.getMessage());
             }
         }).start();
     }
@@ -47,7 +31,6 @@ public class FileTransferManager {
         try (var inputStream = clientSocket.getInputStream()) {
             FileChunk chunk = FileChunk.readFromStream(inputStream);
             onChunkReceived.accept(chunk);
-            System.out.println("Chunk received: " + chunk.getChunkIndex());
         } catch (IOException e) {
             System.err.println("Error handling client: " + e.getMessage());
         } finally {
@@ -63,14 +46,10 @@ public class FileTransferManager {
         try {
             if (serverSocket != null && !serverSocket.isClosed()) {
                 serverSocket.close();
-                System.out.println("Stopped listening on port: " + listeningPort);
+                System.out.println("Stopped file transfer listener.");
             }
         } catch (IOException e) {
-            System.err.println("Error stopping server socket: " + e.getMessage());
+            System.err.println("Error stopping file transfer listener: " + e.getMessage());
         }
-    }
-
-    public int getListeningPort() {
-        return listeningPort;
     }
 }

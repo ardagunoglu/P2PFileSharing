@@ -10,30 +10,34 @@ import java.util.Set;
 public class PeerDiscovery {
     private static final int DISCOVERY_PORT = 9876;
     private final Set<Peer> discoveredPeers = new HashSet<>();
-    private final P2PModel model; // Reference to the model
+    private final P2PModel model;
     private boolean running = true;
 
     public PeerDiscovery(P2PModel model) {
-        this.model = model; // Initialize with model
+        this.model = model;
     }
 
     public void discoverPeers() throws Exception {
-        DatagramSocket socket = new DatagramSocket();
-        socket.setBroadcast(true);
-
-        String discoveryMessage = "P2P_DISCOVERY";
-        DatagramPacket packet = new DatagramPacket(
-            discoveryMessage.getBytes(),
-            discoveryMessage.length(),
-            InetAddress.getByName("255.255.255.255"),
-            DISCOVERY_PORT
-        );
-
-        socket.send(packet);
-        System.out.println("Discovery message sent. Waiting for peers...");
+        new Thread(() -> {
+            try (DatagramSocket socket = new DatagramSocket()) {
+                socket.setBroadcast(true);
+                String discoveryMessage = "P2P_DISCOVERY";
+                DatagramPacket packet = new DatagramPacket(
+                        discoveryMessage.getBytes(),
+                        discoveryMessage.length(),
+                        InetAddress.getByName("255.255.255.255"),
+                        DISCOVERY_PORT
+                );
+                socket.send(packet);
+                System.out.println("Discovery message sent to broadcast address.");
+            } catch (Exception e) {
+                System.err.println("Error broadcasting discovery message: " + e.getMessage());
+            }
+        }).start();
 
         new Thread(() -> {
             try (DatagramSocket listenerSocket = new DatagramSocket(DISCOVERY_PORT)) {
+                System.out.println("Listening for peers on port " + DISCOVERY_PORT);
                 while (running) {
                     byte[] buffer = new byte[1024];
                     DatagramPacket responsePacket = new DatagramPacket(buffer, buffer.length);
@@ -49,6 +53,7 @@ public class PeerDiscovery {
 
                             Peer peer = new Peer(peerId, peerAddress, peerPort);
                             if (discoveredPeers.add(peer)) {
+                                model.addPeer(peer); // Add peer to P2PModel
                                 System.out.println("Discovered peer: " + peer);
                             }
                         }
@@ -60,24 +65,29 @@ public class PeerDiscovery {
         }).start();
     }
 
+    public void sendResponse(InetAddress requesterAddress, int requesterPort) {
+        new Thread(() -> {
+            try (DatagramSocket socket = new DatagramSocket()) {
+                String responseMessage = "P2P_RESPONSE:peer_id:5000";
+                DatagramPacket responsePacket = new DatagramPacket(
+                        responseMessage.getBytes(),
+                        responseMessage.length(),
+                        requesterAddress,
+                        requesterPort
+                );
+                socket.send(responsePacket);
+                System.out.println("Response sent to " + requesterAddress);
+            } catch (Exception e) {
+                System.err.println("Error sending response: " + e.getMessage());
+            }
+        }).start();
+    }
+
     public void stopDiscovery() {
         running = false;
     }
 
     public Set<Peer> getDiscoveredPeers() {
         return discoveredPeers;
-    }
-
-    public static void sendResponse(DatagramPacket requestPacket) throws Exception {
-        String responseMessage = "P2P_RESPONSE:peer_id:" + DISCOVERY_PORT;
-        DatagramSocket responseSocket = new DatagramSocket();
-        DatagramPacket responsePacket = new DatagramPacket(
-            responseMessage.getBytes(),
-            responseMessage.length(),
-            requestPacket.getAddress(),
-            requestPacket.getPort()
-        );
-        responseSocket.send(responsePacket);
-        responseSocket.close();
     }
 }

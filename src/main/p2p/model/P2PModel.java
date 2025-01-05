@@ -7,7 +7,7 @@ public class P2PModel {
     private String sharedFolderPath = "C:\\My Shared Folder\\";
     private String destinationPath = "C:\\P2P Downloads\\";
     private boolean isConnected = false;
-    private Set<Peer> peers = new HashSet<>();
+    private final Set<Peer> peers = new HashSet<>();
 
     public String getSharedFolderPath() {
         return sharedFolderPath;
@@ -34,10 +34,33 @@ public class P2PModel {
     }
 
     public Set<Peer> getPeers() {
-        return peers;
+        return new HashSet<>(peers);
     }
 
-    public void setPeers(Set<Peer> peers) {
-        this.peers = peers;
+    public void addPeer(Peer peer) {
+        if (peers.add(peer)) {
+            System.out.println("New peer added: " + peer);
+        }
+    }
+
+    public void clearPeers() {
+        peers.clear();
+    }
+
+    public void setPeers(Set<Peer> newPeers) {
+        peers.clear();
+        peers.addAll(newPeers);
+    }
+
+    public void removePeer(Peer peer) {
+        if (peers.remove(peer)) {
+            System.out.println("Peer removed: " + peer);
+        }
+    }
+
+    @Override
+    public String toString() {
+        return String.format("P2PModel{sharedFolderPath='%s', destinationPath='%s', isConnected=%s, peers=%s}",
+                sharedFolderPath, destinationPath, isConnected, peers);
     }
 }
