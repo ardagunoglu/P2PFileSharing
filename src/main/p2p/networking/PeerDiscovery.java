@@ -17,7 +17,8 @@ public class PeerDiscovery {
         this.model = model;
     }
 
-    public void discoverPeers() throws Exception {
+    public void discoverPeers() {
+        // Broadcast discovery message
         new Thread(() -> {
             try (DatagramSocket socket = new DatagramSocket()) {
                 socket.setBroadcast(true);
@@ -35,20 +36,25 @@ public class PeerDiscovery {
             }
         }).start();
 
+        // Listen for discovery messages and respond
         new Thread(() -> {
             try (DatagramSocket listenerSocket = new DatagramSocket(DISCOVERY_PORT)) {
                 System.out.println("Listening for peers on port " + DISCOVERY_PORT);
                 while (running) {
                     byte[] buffer = new byte[1024];
-                    DatagramPacket responsePacket = new DatagramPacket(buffer, buffer.length);
-                    listenerSocket.receive(responsePacket);
+                    DatagramPacket packet = new DatagramPacket(buffer, buffer.length);
+                    listenerSocket.receive(packet);
 
-                    String receivedData = new String(responsePacket.getData(), 0, responsePacket.getLength());
-                    if (receivedData.startsWith("P2P_RESPONSE")) {
+                    String receivedData = new String(packet.getData(), 0, packet.getLength());
+                    if (receivedData.equals("P2P_DISCOVERY")) {
+                        // Send response to the requester
+                        sendResponse(packet.getAddress(), packet.getPort());
+                    } else if (receivedData.startsWith("P2P_RESPONSE")) {
+                        // Handle incoming response
                         String[] parts = receivedData.split(":");
                         if (parts.length == 3) {
                             String peerId = parts[1];
-                            String peerAddress = responsePacket.getAddress().getHostAddress();
+                            String peerAddress = packet.getAddress().getHostAddress();
                             int peerPort = Integer.parseInt(parts[2]);
 
                             Peer peer = new Peer(peerId, peerAddress, peerPort);
@@ -68,7 +74,7 @@ public class PeerDiscovery {
     public void sendResponse(InetAddress requesterAddress, int requesterPort) {
         new Thread(() -> {
             try (DatagramSocket socket = new DatagramSocket()) {
-                String responseMessage = "P2P_RESPONSE:peer_id:5000";
+                String responseMessage = "P2P_RESPONSE:peer_id:4000";
                 DatagramPacket responsePacket = new DatagramPacket(
                         responseMessage.getBytes(),
                         responseMessage.length(),
@@ -76,7 +82,7 @@ public class PeerDiscovery {
                         requesterPort
                 );
                 socket.send(responsePacket);
-                System.out.println("Response sent to " + requesterAddress);
+                System.out.println("Response sent to " + requesterAddress.getHostAddress());
             } catch (Exception e) {
                 System.err.println("Error sending response: " + e.getMessage());
             }
