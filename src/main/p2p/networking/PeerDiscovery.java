@@ -8,9 +8,9 @@ import java.util.HashSet;
 import java.util.Set;
 
 public class PeerDiscovery {
-    private static final int DISCOVERY_PORT = 9876;
+    private static final int DISCOVERY_PORT = 4000;
     private final Set<Peer> discoveredPeers = new HashSet<>();
-    private final P2PModel model;
+    private final P2PModel model; // Reference to P2PModel
     private boolean running = true;
 
     public PeerDiscovery(P2PModel model) {
@@ -25,7 +25,7 @@ public class PeerDiscovery {
                 DatagramPacket packet = new DatagramPacket(
                         discoveryMessage.getBytes(),
                         discoveryMessage.length(),
-                        InetAddress.getByName("255.255.255.255"),
+                        InetAddress.getByName("192.168.1.255"),
                         DISCOVERY_PORT
                 );
                 socket.send(packet);
