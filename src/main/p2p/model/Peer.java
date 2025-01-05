@@ -1,5 +1,7 @@
 package main.p2p.model;
 
+import java.util.Objects;
+
 public class Peer {
     private final String peerId;
     private final String ipAddress;
@@ -21,6 +23,19 @@ public class Peer {
 
     public int getPort() {
         return port;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Peer peer = (Peer) o;
+        return peerId.equals(peer.peerId);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(peerId);
     }
 
     @Override

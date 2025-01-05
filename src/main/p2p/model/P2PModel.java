@@ -53,8 +53,9 @@ public class P2PModel {
     }
 
     public void removePeer(Peer peer) {
-        if (peers.remove(peer)) {
-            System.out.println("Peer removed: " + peer);
+        synchronized (peers) {
+            peers.remove(peer);
+            System.out.println("Removed peer from model: " + peer);
         }
     }
 

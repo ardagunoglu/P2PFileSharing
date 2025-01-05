@@ -111,16 +111,15 @@ public class PeerDiscovery {
         }).start();
     }
 
-
     private void sendResponse(InetAddress requesterAddress, int requesterPort) {
         new Thread(() -> {
             try (DatagramSocket socket = new DatagramSocket()) {
-                String responseMessage = "P2P_RESPONSE:peer_id:" + DISCOVERY_PORT;
+                String responseMessage = "P2P_RESPONSE:" + generatePeerId(requesterAddress, DISCOVERY_PORT);
                 DatagramPacket responsePacket = new DatagramPacket(
-                        responseMessage.getBytes(),
-                        responseMessage.length(),
-                        requesterAddress,
-                        requesterPort
+                    responseMessage.getBytes(),
+                    responseMessage.length(),
+                    requesterAddress,
+                    requesterPort
                 );
 
                 socket.send(responsePacket);
@@ -156,22 +155,27 @@ public class PeerDiscovery {
             String peerAddress = senderAddress.getHostAddress();
             int peerPort = Integer.parseInt(parts[2]);
 
-            Peer peer = new Peer(peerId, peerAddress, peerPort);
+            Peer newPeer = new Peer(peerId, peerAddress, peerPort);
 
             synchronized (discoveredPeers) {
-                if (!discoveredPeers.contains(peer)) {
-                    discoveredPeers.add(peer);
-                    model.addPeer(peer);
-                    System.out.println("Discovered peer: " + peer);
-
-                    sendFinalizedMessage(peerAddress, peerPort);
-                } else {
-                    System.out.println("Peer already discovered: " + peer);
+                if (discoveredPeers.contains(newPeer)) {
+                	discoveredPeers.remove(newPeer);
+                    model.removePeer(newPeer);
+                    System.out.println("Removed duplicate peer: " + newPeer);
                 }
+
+                discoveredPeers.add(newPeer);
+                model.addPeer(newPeer);
+                System.out.println("Discovered peer: " + newPeer);
+
+                sendFinalizedMessage(peerAddress, peerPort);
             }
         }
     }
-
+    
+    private String generatePeerId(InetAddress address, int port) {
+        return address.getHostAddress() + ":" + port;
+    }
 
     public void stopDiscovery() {
         running = false;
