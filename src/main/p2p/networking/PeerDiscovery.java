@@ -157,14 +157,21 @@ public class PeerDiscovery {
             int peerPort = Integer.parseInt(parts[2]);
 
             Peer peer = new Peer(peerId, peerAddress, peerPort);
-            if (discoveredPeers.add(peer)) {
-                model.addPeer(peer);
-                System.out.println("Discovered peer: " + peer);
 
-                sendFinalizedMessage(peerAddress, peerPort);
+            synchronized (discoveredPeers) {
+                if (!discoveredPeers.contains(peer)) {
+                    discoveredPeers.add(peer);
+                    model.addPeer(peer);
+                    System.out.println("Discovered peer: " + peer);
+
+                    sendFinalizedMessage(peerAddress, peerPort);
+                } else {
+                    System.out.println("Peer already discovered: " + peer);
+                }
             }
         }
     }
+
 
     public void stopDiscovery() {
         running = false;
