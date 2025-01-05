@@ -100,23 +100,22 @@ public class PeerDiscovery {
     }
     
     private InetAddress getLocalAddress() throws SocketException {
-        InetAddress localAddress = null;
-
         for (NetworkInterface networkInterface : Collections.list(NetworkInterface.getNetworkInterfaces())) {
             if (networkInterface.isLoopback() || networkInterface.isVirtual() || !networkInterface.isUp()) {
-                continue; // Skip loopback, virtual, or inactive interfaces
+                continue;
             }
 
-            for (InetAddress inetAddress : Collections.list(networkInterface.getInetAddresses())) {
-                if (!inetAddress.isLoopbackAddress() && inetAddress instanceof Inet4Address) {
-                    localAddress = inetAddress;
-                    break;
+            for (InetAddress address : Collections.list(networkInterface.getInetAddresses())) {
+                if (address instanceof Inet4Address && !address.isLoopbackAddress()) {
+                    if (address.getHostAddress().startsWith("192.168.1.")) {
+                        return address;
+                    }
                 }
             }
-            if (localAddress != null) break;
         }
-        return localAddress;
+        throw new SocketException("No suitable local address found");
     }
+
 
     private void processResponse(String responseData, InetAddress senderAddress) {
         String[] parts = responseData.split(":");
