@@ -103,6 +103,10 @@ public class PeerDiscovery {
         InetAddress localAddress = null;
 
         for (NetworkInterface networkInterface : Collections.list(NetworkInterface.getNetworkInterfaces())) {
+            if (networkInterface.isLoopback() || networkInterface.isVirtual() || !networkInterface.isUp()) {
+                continue; // Skip loopback, virtual, or inactive interfaces
+            }
+
             for (InetAddress inetAddress : Collections.list(networkInterface.getInetAddresses())) {
                 if (!inetAddress.isLoopbackAddress() && inetAddress instanceof Inet4Address) {
                     localAddress = inetAddress;
@@ -113,8 +117,6 @@ public class PeerDiscovery {
         }
         return localAddress;
     }
-
-
 
     private void processResponse(String responseData, InetAddress senderAddress) {
         String[] parts = responseData.split(":");
