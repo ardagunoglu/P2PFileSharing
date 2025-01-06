@@ -29,4 +29,9 @@ public class FoundFilesPanel extends AbstractListPanel {
         }
         getList().setModel(model);
     }
+    
+    public void clearList() {
+        DefaultListModel<String> model = (DefaultListModel<String>) getList().getModel();
+        model.clear();
+    }
 }

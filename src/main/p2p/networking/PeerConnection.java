@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 
+import javax.swing.JList;
 import javax.swing.SwingUtilities;
 
 public class PeerConnection {
@@ -23,10 +24,11 @@ public class PeerConnection {
     private boolean running = true;
     private DatagramSocket socket;
     private P2PController controller;
+    private final JList<String> excludeFilesMasksList;
     
     private final CountDownLatch disconnectLatch = new CountDownLatch(1);
 
-    public PeerConnection(P2PModel model, P2PController controller) {
+    public PeerConnection(P2PModel model, P2PController controller, JList<String> excludeFilesMasksList) {
         this.model = model;
         try {
             this.socket = new DatagramSocket(CONNECTION_PORT);
@@ -35,6 +37,7 @@ public class PeerConnection {
             throw new RuntimeException("Error initializing socket: " + e.getMessage(), e);
         }
         this.controller = controller;
+        this.excludeFilesMasksList = excludeFilesMasksList;
     }
 
     public void connectPeers() {
@@ -141,7 +144,11 @@ public class PeerConnection {
         String query = receivedData.substring(7).trim();
         System.out.println("Search query received: " + query);
 
-        FileSearchManager fileSearchManager = new FileSearchManager(new File(model.getSharedFolderPath()));
+        FileSearchManager fileSearchManager = new FileSearchManager(
+                new File(model.getSharedFolderPath()),
+                excludeFilesMasksList
+            );
+
         List<String> foundFiles = fileSearchManager.searchFiles(query);
 
         String response = String.join(",", foundFiles);
@@ -151,10 +158,10 @@ public class PeerConnection {
 
         try {
             DatagramPacket responsePacket = new DatagramPacket(
-                    response.getBytes(),
-                    response.length(),
-                    senderAddress,
-                    senderPort
+                response.getBytes(),
+                response.length(),
+                senderAddress,
+                senderPort
             );
             socket.send(responsePacket);
             System.out.println("Search response sent to " + senderAddress + ":" + senderPort);
@@ -162,7 +169,6 @@ public class PeerConnection {
             System.err.println("Error sending search response: " + e.getMessage());
         }
     }
-
 
     private void handleDisconnectMessage(String message, InetAddress senderAddress) {
         Peer disconnectingPeer = new Peer(senderAddress.getHostAddress(), senderAddress.getHostAddress(), CONNECTION_PORT);

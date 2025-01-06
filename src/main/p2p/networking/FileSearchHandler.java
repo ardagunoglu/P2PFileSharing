@@ -8,6 +8,8 @@ import java.net.InetAddress;
 import java.util.HashMap;
 import java.util.Map;
 
+import javax.swing.JList;
+
 public class FileSearchHandler {
 
     private static final int TIMEOUT_MS = 3000;
@@ -31,8 +33,10 @@ public class FileSearchHandler {
             socket.receive(responsePacket);
 
             String response = new String(responsePacket.getData(), 0, responsePacket.getLength());
-            for (String file : response.split(",")) {
-                foundFiles.put(file.trim(), peer);
+            if (!response.equals("NO_FILES_FOUND")) {
+                for (String file : response.split(",")) {
+                    foundFiles.put(file.trim(), peer);
+                }
             }
         } catch (Exception e) {
             System.err.println("Error searching on peer " + peer.getIpAddress() + ": " + e.getMessage());

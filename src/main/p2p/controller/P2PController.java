@@ -42,7 +42,7 @@ public class P2PController {
     	    view.getDisconnectMenuItem().setEnabled(true);
 
     	    try {
-    	    	peerConnection = new PeerConnection(model, this);
+    	    	peerConnection = new PeerConnection(model, this, view.getSettingsPanel().getExcludeFilesMasksPanel().getExcludeFilesMasksList());
     	    	 if (!model.getPeers().stream().anyMatch(peer -> peer.getPeerId().equals("local_peer"))) {
     	             Peer localPeer = new Peer("local_peer", NetworkUtils.getLocalAddress().getHostAddress(), 4000);
     	             model.addPeer(localPeer);
@@ -146,6 +146,8 @@ public class P2PController {
                 return;
             }
 
+            view.getFoundFilesPanel().clearList();
+
             Map<String, Peer> foundFiles = searchFilesFromPeers(searchQuery);
 
             if (foundFiles.isEmpty()) {
@@ -155,6 +157,7 @@ public class P2PController {
                 view.getFoundFilesPanel().updateFoundFilesList(foundFiles); // Pass the map to the panel
             }
         });
+
     }
 
     private void updateDelFolderButtonState() {
@@ -185,7 +188,12 @@ public class P2PController {
         for (Peer peer : model.getPeerGraph().getAllPeers()) {
             if (!peer.getPeerId().equals("local_peer")) {
                 Map<String, Peer> peerFiles = fileSearchHandler.searchFilesFromPeer(searchQuery, peer);
-                allFoundFiles.putAll(peerFiles); // Merge results into the main map
+
+                if (!peerFiles.isEmpty()) {
+                    allFoundFiles.putAll(peerFiles);
+                } else {
+                    System.out.println("No files found for query '" + searchQuery + "' on peer: " + peer.getIpAddress());
+                }
             }
         }
 
