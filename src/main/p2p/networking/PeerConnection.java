@@ -123,24 +123,10 @@ public class PeerConnection {
 
                     System.out.println("Received data: " + receivedData + " from " + senderAddress);
 
-                    try {
-                        MessageType messageType = MessageType.fromString(receivedData);
-                        switch (messageType) {
-                            case P2P_CONNECT_ME:
-                                sendResponse(senderAddress, receivedPacket.getPort());
-                                break;
-                            case P2P_DISCONNECT:
-                                handleDisconnectMessage(receivedData, senderAddress);
-                                break;
-                            case P2P_FINALIZED:
-                                handleFinalizedMessage(senderAddress);
-                                break;
-                            case P2P_RESPONSE:
-                                processResponse(receivedData, senderAddress);
-                                break;
-                        }
-                    } catch (IllegalArgumentException e) {
-                        System.out.println("Unknown message type received: " + receivedData);
+                    if (receivedData.startsWith("SEARCH:")) {
+                        handleSearchRequest(receivedData, senderAddress, receivedPacket.getPort());
+                    } else {
+                        handlePeerConnectionMessages(receivedData, receivedPacket, senderAddress);
                     }
                 }
             } catch (Exception e) {
@@ -151,34 +137,30 @@ public class PeerConnection {
         }).start();
     }
     
-    private void listenForSearchRequests() {
-        new Thread(() -> {
-            while (running) {
-                try {
-                    byte[] buffer = new byte[1024];
-                    DatagramPacket receivedPacket = new DatagramPacket(buffer, buffer.length);
-                    socket.receive(receivedPacket);
+    private void handleSearchRequest(String receivedData, InetAddress senderAddress, int senderPort) {
+        String query = receivedData.substring(7).trim();
+        System.out.println("Search query received: " + query);
 
-                    String message = new String(receivedPacket.getData(), 0, receivedPacket.getLength());
-                    if (message.startsWith("SEARCH:")) {
-                        String query = message.substring(7).trim();
-                        List<String> results = new FileSearchManager(new File(model.getSharedFolderPath())).searchFiles(query);
+        FileSearchManager fileSearchManager = new FileSearchManager(new File(model.getSharedFolderPath()));
+        List<String> foundFiles = fileSearchManager.searchFiles(query);
 
-                        // Send results back to the requester
-                        String response = String.join(",", results);
-                        DatagramPacket responsePacket = new DatagramPacket(
-                                response.getBytes(),
-                                response.length(),
-                                receivedPacket.getAddress(),
-                                receivedPacket.getPort()
-                        );
-                        socket.send(responsePacket);
-                    }
-                } catch (Exception e) {
-                    System.err.println("Error processing search request: " + e.getMessage());
-                }
-            }
-        }).start();
+        String response = String.join(",", foundFiles);
+        if (response.isEmpty()) {
+            response = "NO_FILES_FOUND";
+        }
+
+        try {
+            DatagramPacket responsePacket = new DatagramPacket(
+                    response.getBytes(),
+                    response.length(),
+                    senderAddress,
+                    senderPort
+            );
+            socket.send(responsePacket);
+            System.out.println("Search response sent to " + senderAddress + ":" + senderPort);
+        } catch (Exception e) {
+            System.err.println("Error sending search response: " + e.getMessage());
+        }
     }
 
 
@@ -193,6 +175,8 @@ public class PeerConnection {
             }
         }
     }
+    
+    
     
     private void sendFinalizedMessage(String peerAddress, int peerPort) {
         new Thread(() -> {
@@ -210,6 +194,28 @@ public class PeerConnection {
                 System.err.println("Error sending finalized message: " + e.getMessage());
             }
         }).start();
+    }
+    
+    private void handlePeerConnectionMessages(String receivedData, DatagramPacket receivedPacket, InetAddress senderAddress) throws SocketException {
+    	try {
+            MessageType messageType = MessageType.fromString(receivedData);
+            switch (messageType) {
+                case P2P_CONNECT_ME:
+                    sendResponse(senderAddress, receivedPacket.getPort());
+                    break;
+                case P2P_DISCONNECT:
+                    handleDisconnectMessage(receivedData, senderAddress);
+                    break;
+                case P2P_FINALIZED:
+                    handleFinalizedMessage(senderAddress);
+                    break;
+                case P2P_RESPONSE:
+                    processResponse(receivedData, senderAddress);
+                    break;
+            }
+        } catch (IllegalArgumentException e) {
+            System.out.println("Unknown message type received: " + receivedData);
+        }
     }
 
     private void sendResponse(InetAddress requesterAddress, int requesterPort) {
