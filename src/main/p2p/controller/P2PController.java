@@ -45,7 +45,7 @@ public class P2PController {
     	             Peer localPeer = new Peer("local_peer", NetworkUtils.getLocalAddress().getHostAddress(), 4000);
     	             model.addPeer(localPeer);
     	         }
-    	        peerDiscovery.discoverPeers();
+    	        peerDiscovery.connectPeers();
     	        JOptionPane.showMessageDialog(view, "Connected P2P network");
     	    } catch (Exception ex) {
     	        JOptionPane.showMessageDialog(view, "Failed to connect: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
@@ -59,7 +59,7 @@ public class P2PController {
 
             peerDiscovery.sendDisconnectMessage();
             model.getPeers().forEach(model::removePeer);
-            peerDiscovery.stopDiscovery();
+            peerDiscovery.stopConnection();
             JOptionPane.showMessageDialog(view, "Disconnected from P2P network");
         });
 

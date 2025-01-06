@@ -14,7 +14,7 @@ import java.util.concurrent.CountDownLatch;
 import javax.swing.SwingUtilities;
 
 public class PeerConnection {
-    private static final int DISCOVERY_PORT = 4000;
+    private static final int CONNECTION_PORT = 4000;
     private final P2PModel model;
     private final Set<Peer> foundPeers = new HashSet<>();
     private boolean running = true;
@@ -26,7 +26,7 @@ public class PeerConnection {
     public PeerConnection(P2PModel model, P2PController controller) {
         this.model = model;
         try {
-            this.socket = new DatagramSocket(DISCOVERY_PORT);
+            this.socket = new DatagramSocket(CONNECTION_PORT);
             this.socket.setBroadcast(true);
         } catch (SocketException e) {
             throw new RuntimeException("Error initializing socket: " + e.getMessage(), e);
@@ -34,40 +34,40 @@ public class PeerConnection {
         this.controller = controller;
     }
 
-    public void discoverPeers() {
+    public void connectPeers() {
         if (socket == null || socket.isClosed()) {
             try {
-                socket = new DatagramSocket(DISCOVERY_PORT);
+                socket = new DatagramSocket(CONNECTION_PORT);
                 socket.setBroadcast(true);
-                System.out.println("Socket reinitialized for discovery.");
+                System.out.println("Socket reinitialized for connection.");
             } catch (SocketException e) {
                 throw new RuntimeException("Error reinitializing socket: " + e.getMessage(), e);
             }
         }
 
-        sendDiscoveryMessage();
+        sendConnectMessage();
 
         if (running) {
             listenForResponses();
         }
     }
 
-    private void sendDiscoveryMessage() {
+    private void sendConnectMessage() {
         new Thread(() -> {
             try {
-                String discoveryMessage = MessageType.P2P_CONNECT_ME.getValue();
+                String connectMessage = MessageType.P2P_CONNECT_ME.getValue();
                 DatagramPacket packet = new DatagramPacket(
-                        discoveryMessage.getBytes(),
-                        discoveryMessage.length(),
+                        connectMessage.getBytes(),
+                        connectMessage.length(),
                         InetAddress.getByName("192.168.1.255"),
-                        DISCOVERY_PORT
+                        CONNECTION_PORT
                 );
 
                 socket.send(packet);
-                System.out.println("Discovery message sent to broadcast address.");
+                System.out.println("Connection message sent to broadcast address.");
 
             } catch (Exception e) {
-                System.err.println("Error sending discovery message: " + e.getMessage());
+                System.err.println("Error sending connection message: " + e.getMessage());
             }
         }).start();
     }
@@ -80,7 +80,7 @@ public class PeerConnection {
                         disconnectMessage.getBytes(),
                         disconnectMessage.length(),
                         InetAddress.getByName("192.168.1.255"),
-                        DISCOVERY_PORT
+                        CONNECTION_PORT
                 );
 
                 socket.send(packet);
@@ -150,7 +150,7 @@ public class PeerConnection {
     }
 
     private void handleDisconnectMessage(String message, InetAddress senderAddress) {
-        Peer disconnectingPeer = new Peer(senderAddress.getHostAddress(), senderAddress.getHostAddress(), DISCOVERY_PORT);
+        Peer disconnectingPeer = new Peer(senderAddress.getHostAddress(), senderAddress.getHostAddress(), CONNECTION_PORT);
 
         synchronized (foundPeers) {
             if (foundPeers.remove(disconnectingPeer)) {
@@ -200,7 +200,7 @@ public class PeerConnection {
     }
 
     private void processResponse(String responseData, InetAddress senderAddress) throws SocketException {
-        Peer newPeer = new Peer(senderAddress.getHostAddress(), senderAddress.getHostAddress(), DISCOVERY_PORT);
+        Peer newPeer = new Peer(senderAddress.getHostAddress(), senderAddress.getHostAddress(), CONNECTION_PORT);
 
         synchronized (foundPeers) {
             if (!foundPeers.contains(newPeer)) {
@@ -214,7 +214,7 @@ public class PeerConnection {
 
                 model.addConnection(localPeer, newPeer);
 
-                System.out.println("Discovered and connected peer: " + newPeer);
+                System.out.println("Connected, connected peer: " + newPeer);
 
                 sendFinalizedMessage(newPeer.getIpAddress(), newPeer.getPort());
 
@@ -227,7 +227,7 @@ public class PeerConnection {
 
     private void handleFinalizedMessage(InetAddress senderAddress) {
         synchronized (foundPeers) {
-            Peer finalizedPeer = new Peer(senderAddress.getHostAddress(), senderAddress.getHostAddress(), DISCOVERY_PORT);
+            Peer finalizedPeer = new Peer(senderAddress.getHostAddress(), senderAddress.getHostAddress(), CONNECTION_PORT);
 
             if (!foundPeers.contains(finalizedPeer)) {
                 foundPeers.add(finalizedPeer);
@@ -248,14 +248,14 @@ public class PeerConnection {
         }
     }
 
-    public void stopDiscovery() {
+    public void stopConnection() {
         running = false;
         try {
             disconnectLatch.await();
 
             if (socket != null && !socket.isClosed()) {
                 socket.close();
-                System.out.println("Socket closed during stopDiscovery.");
+                System.out.println("Socket closed during stopConnection.");
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
