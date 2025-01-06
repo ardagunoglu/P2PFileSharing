@@ -1,8 +1,9 @@
 package main.p2p.file;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
+
 import javax.swing.*;
 
 public class FileSearchManager {
@@ -19,45 +20,44 @@ public class FileSearchManager {
         this.rootOnly = rootOnly;
     }
 
-    public List<String> searchFiles(String query) {
-        List<String> result = new ArrayList<>();
+    public Map<String, String> searchFiles(String query) {
+        Map<String, String> result = new HashMap<>(); // Map of relativePath -> fileName
         if (rootDirectory != null && rootDirectory.isDirectory()) {
-        	if (rootOnly) {
+            if (rootOnly) {
                 searchInRootOnly(rootDirectory, query, result);
             } else {
-                searchInDirectory(rootDirectory, query, result);
+                searchInDirectory(rootDirectory, query, result, "");
             }
         }
         return result;
     }
 
-    private void searchInDirectory(File directory, String query, List<String> result) {
-    	if (shouldExcludeDirectory(directory)) {
+    private void searchInDirectory(File directory, String query, Map<String, String> result, String relativePath) {
+        if (shouldExcludeDirectory(directory)) {
             System.out.println("Skipping excluded directory: " + directory.getName());
             return;
         }
-    	
+
         File[] files = directory.listFiles();
         if (files != null) {
             for (File file : files) {
+                String newRelativePath = relativePath + "/" + file.getName();
                 if (file.isDirectory()) {
-                    searchInDirectory(file, query, result);
-                } else {
-                    if (shouldIncludeFile(file, query)) {
-                        result.add(file.getName());
-                        System.out.println("File matched: " + file.getName());
-                    }
+                    searchInDirectory(file, query, result, newRelativePath);
+                } else if (shouldIncludeFile(file, query)) {
+                    result.put(newRelativePath, file.getName());
+                    System.out.println("File matched: " + newRelativePath);
                 }
             }
         }
     }
     
-    private void searchInRootOnly(File directory, String query, List<String> result) {
+    private void searchInRootOnly(File directory, String query, Map<String, String> result) {
         File[] files = directory.listFiles();
         if (files != null) {
             for (File file : files) {
                 if (!file.isDirectory() && shouldIncludeFile(file, query)) {
-                    result.add(file.getName());
+                    result.put("/" + file.getName(), file.getName());
                     System.out.println("File matched in root only: " + file.getName());
                 }
             }
@@ -65,8 +65,8 @@ public class FileSearchManager {
     }
     
     private boolean shouldExcludeDirectory(File directory) {
-    	String dirName = directory.getName().toLowerCase();
-    	ListModel<String> exclusionListModel = excludeFoldersList.getModel();
+        String dirName = directory.getName().toLowerCase();
+        ListModel<String> exclusionListModel = excludeFoldersList.getModel();
 
         for (int i = 0; i < exclusionListModel.getSize(); i++) {
             String excludedDir = exclusionListModel.getElementAt(i).toLowerCase();

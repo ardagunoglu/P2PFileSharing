@@ -11,6 +11,7 @@ import java.net.*;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 
@@ -155,17 +156,21 @@ public class PeerConnection {
                 rootOnly
             );
 
-        List<String> foundFiles = fileSearchManager.searchFiles(query);
+        Map<String, String> foundFiles = fileSearchManager.searchFiles(query);
 
-        String response = String.join(",", foundFiles);
-        if (response.isEmpty()) {
-            response = "NO_FILES_FOUND";
+        StringBuilder response = new StringBuilder();
+        for (Map.Entry<String, String> entry : foundFiles.entrySet()) {
+            response.append(entry.getKey()).append(",");
         }
+
+        String responseString = response.length() > 0
+            ? response.substring(0, response.length() - 1)
+            : "NO_FILES_FOUND";
 
         try {
             DatagramPacket responsePacket = new DatagramPacket(
-                response.getBytes(),
-                response.length(),
+                responseString.getBytes(),
+                responseString.length(),
                 senderAddress,
                 senderPort
             );
