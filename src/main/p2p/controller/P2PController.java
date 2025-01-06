@@ -182,7 +182,7 @@ public class P2PController {
         
         for (Peer peer : peerDiscovery.getfoundPeers()) {
             // Mock search logic - replace this with actual file discovery request/response
-            foundFiles.add("File1 from " + peer.getPeerId());
+        	foundFiles.add(searchQuery + " from " + peer.getIpAddress());
         }
         
         return foundFiles;
