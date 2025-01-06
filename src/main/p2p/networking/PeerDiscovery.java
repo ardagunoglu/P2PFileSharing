@@ -58,6 +58,33 @@ public class PeerDiscovery {
             }
         }).start();
     }
+    
+    public void sendDisconnectMessage() {
+        new Thread(() -> {
+            try {
+                String disconnectMessage = "P2P_DISCONNECT";
+                DatagramPacket packet = new DatagramPacket(
+                        disconnectMessage.getBytes(),
+                        disconnectMessage.length(),
+                        InetAddress.getByName("192.168.1.255"),
+                        DISCOVERY_PORT
+                );
+
+                socket.send(packet);
+                System.out.println("Disconnect message sent to all peers.");
+                
+                synchronized (discoveredPeers) {
+                    discoveredPeers.clear();
+                    model.getPeerGraph().getAllPeers().forEach(model::removePeer);
+                    System.out.println("Cleared local peers and graph.");
+                }
+                controller.updateUIList();
+            } catch (Exception e) {
+                System.err.println("Error sending disconnect message: " + e.getMessage());
+            }
+        }).start();
+    }
+
 
     private void listenForResponses() {
         new Thread(() -> {
@@ -82,6 +109,8 @@ public class PeerDiscovery {
 
                     if (receivedData.equals("P2P_DISCOVERY")) {
                         sendResponse(senderAddress, receivedPacket.getPort());
+                    } else if (receivedData.startsWith("P2P_DISCONNECT")) {
+                        handleDisconnectMessage(receivedData, senderAddress);
                     } else {
                         processResponse(receivedData, senderAddress);
                     }
@@ -94,6 +123,23 @@ public class PeerDiscovery {
         }).start();
     }
 
+    private void handleDisconnectMessage(String message, InetAddress senderAddress) {
+        String[] parts = message.split(":");
+        if (parts.length == 3) {
+            String peerId = parts[1];
+            Peer disconnectingPeer = new Peer(peerId, senderAddress.getHostAddress(), DISCOVERY_PORT);
+
+            synchronized (discoveredPeers) {
+                if (discoveredPeers.remove(disconnectingPeer)) {
+                    model.removePeer(disconnectingPeer);
+                    model.getPeerGraph().removePeer(disconnectingPeer);
+                    System.out.println("Peer disconnected: " + disconnectingPeer);
+                    controller.updateUIList();
+                }
+            }
+        }
+    }
+    
     private void sendFinalizedMessage(String peerAddress, int peerPort) {
         new Thread(() -> {
             try {
@@ -115,7 +161,7 @@ public class PeerDiscovery {
     private void sendResponse(InetAddress requesterAddress, int requesterPort) {
         new Thread(() -> {
             try {
-                String responseMessage = "P2P_RESPONSE:" + generatePeerId(requesterAddress, DISCOVERY_PORT);
+                String responseMessage = "P2P_RESPONSE" + generatePeerId(requesterAddress, DISCOVERY_PORT);
                 DatagramPacket responsePacket = new DatagramPacket(
                         responseMessage.getBytes(),
                         responseMessage.length(),

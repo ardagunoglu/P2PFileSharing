@@ -52,6 +52,8 @@ public class P2PController {
             view.getConnectMenuItem().setEnabled(true);
             view.getDisconnectMenuItem().setEnabled(false);
 
+            peerDiscovery.sendDisconnectMessage();
+            model.getPeers().forEach(model::removePeer);
             peerDiscovery.stopDiscovery();
             JOptionPane.showMessageDialog(view, "Disconnected from P2P network");
         });
