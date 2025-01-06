@@ -23,13 +23,14 @@ public class FoundFilesPanel extends AbstractListPanel {
         System.out.println("Found file removed: " + element);
     }
 
-    public void updateFoundFilesList(Map<String, Peer> files) {
+    public void updateFoundFilesList(Map<String, Map.Entry<String, String>> files) {
         DefaultListModel<String> model = new DefaultListModel<>();
         Map<String, Integer> fileNameCounts = new HashMap<>();
 
-        for (Map.Entry<String, Peer> entry : files.entrySet()) {
+        for (Map.Entry<String, Map.Entry<String, String>> entry : files.entrySet()) {
             String relativePath = entry.getKey();
-            String fileName = relativePath.substring(relativePath.lastIndexOf("/") + 1);
+            String fileName = entry.getValue().getKey();
+            String hash = entry.getValue().getValue();
 
             fileNameCounts.put(fileName, fileNameCounts.getOrDefault(fileName, 0) + 1);
             int count = fileNameCounts.get(fileName);
@@ -38,11 +39,12 @@ public class FoundFilesPanel extends AbstractListPanel {
                 ? fileName + " (" + count + ")"
                 : fileName;
 
-            model.addElement(fileDisplay + " (from " + entry.getValue().getIpAddress() + ")");
+            model.addElement(fileDisplay + relativePath);
         }
 
         getList().setModel(model);
     }
+
 
     public void clearList() {
         DefaultListModel<String> model = (DefaultListModel<String>) getList().getModel();

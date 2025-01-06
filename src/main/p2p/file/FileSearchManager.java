@@ -1,6 +1,8 @@
 package main.p2p.file;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.security.MessageDigest;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -20,8 +22,8 @@ public class FileSearchManager {
         this.rootOnly = rootOnly;
     }
 
-    public Map<String, String> searchFiles(String query) {
-        Map<String, String> result = new HashMap<>(); // Map of relativePath -> fileName
+    public Map<String, Map.Entry<String, String>> searchFiles(String query) {
+        Map<String, Map.Entry<String, String>> result = new HashMap<>();
         if (rootDirectory != null && rootDirectory.isDirectory()) {
             if (rootOnly) {
                 searchInRootOnly(rootDirectory, query, result);
@@ -32,7 +34,7 @@ public class FileSearchManager {
         return result;
     }
 
-    private void searchInDirectory(File directory, String query, Map<String, String> result, String relativePath) {
+    private void searchInDirectory(File directory, String query, Map<String, Map.Entry<String, String>> result, String relativePath) {
         if (shouldExcludeDirectory(directory)) {
             System.out.println("Skipping excluded directory: " + directory.getName());
             return;
@@ -45,22 +47,44 @@ public class FileSearchManager {
                 if (file.isDirectory()) {
                     searchInDirectory(file, query, result, newRelativePath);
                 } else if (shouldIncludeFile(file, query)) {
-                    result.put(newRelativePath, file.getName());
-                    System.out.println("File matched: " + newRelativePath);
+                    String hash = computeFileHash(file);
+                    result.put(newRelativePath, Map.entry(file.getName(), hash));
+                    System.out.println("File matched: " + newRelativePath + " | Hash: " + hash);
                 }
             }
         }
     }
     
-    private void searchInRootOnly(File directory, String query, Map<String, String> result) {
+    private void searchInRootOnly(File directory, String query, Map<String, Map.Entry<String, String>> result) {
         File[] files = directory.listFiles();
         if (files != null) {
             for (File file : files) {
                 if (!file.isDirectory() && shouldIncludeFile(file, query)) {
-                    result.put("/" + file.getName(), file.getName());
-                    System.out.println("File matched in root only: " + file.getName());
+                    String hash = computeFileHash(file);
+                    result.put("/" + file.getName(), Map.entry(file.getName(), hash));
+                    System.out.println("File matched in root only: " + file.getName() + " | Hash: " + hash);
                 }
             }
+        }
+    }
+    
+    private String computeFileHash(File file) {
+        try (FileInputStream fis = new FileInputStream(file)) {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] byteArray = new byte[1024];
+            int bytesRead;
+            while ((bytesRead = fis.read(byteArray)) != -1) {
+                digest.update(byteArray, 0, bytesRead);
+            }
+            byte[] hashBytes = digest.digest();
+            StringBuilder sb = new StringBuilder();
+            for (byte b : hashBytes) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            System.err.println("Error calculating hash for file: " + file.getName() + " - " + e.getMessage());
+            return "";
         }
     }
     

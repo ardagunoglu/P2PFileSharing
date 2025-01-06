@@ -141,14 +141,12 @@ public class P2PController {
         });
 
         view.getSearchPanel().getSearchButton().addActionListener(e -> {
-            boolean isConnected = model.isConnected();
-            if (!isConnected) {
-                JOptionPane.showMessageDialog(view, "You should connect to the network first!");
+            if (!model.isConnected()) {
+                JOptionPane.showMessageDialog(view, "You need to connect to the network first!");
                 return;
             }
 
             String searchQuery = view.getSearchPanel().getSearchField().getText().trim();
-
             if (searchQuery.isEmpty()) {
                 JOptionPane.showMessageDialog(view, "Search field cannot be empty!");
                 return;
@@ -156,13 +154,13 @@ public class P2PController {
 
             view.getFoundFilesPanel().clearList();
 
-            Map<String, Peer> foundFiles = searchFilesFromPeers(searchQuery);
+            Map<String, Map.Entry<String, String>> foundFiles = searchFilesFromPeers(searchQuery);
 
             if (foundFiles.isEmpty()) {
                 JOptionPane.showMessageDialog(view, "No files found matching the query: " + searchQuery);
             } else {
                 JOptionPane.showMessageDialog(view, "Search completed. Files found and listed.");
-                view.getFoundFilesPanel().updateFoundFilesList(foundFiles); // Pass the map to the panel
+                view.getFoundFilesPanel().updateFoundFilesList(foundFiles); // Update GUI with files and hashes
             }
         });
 
@@ -189,13 +187,13 @@ public class P2PController {
         view.setVisible(true);
     }
     
-    private Map<String, Peer> searchFilesFromPeers(String searchQuery) {
-        Map<String, Peer> allFoundFiles = new HashMap<>();
+    private Map<String, Map.Entry<String, String>> searchFilesFromPeers(String searchQuery) {
+        Map<String, Map.Entry<String, String>> allFoundFiles = new HashMap<>();
         FileSearchHandler fileSearchHandler = new FileSearchHandler();
 
         for (Peer peer : model.getPeerGraph().getAllPeers()) {
             if (!peer.getPeerId().equals("local_peer")) {
-                Map<String, Peer> peerFiles = fileSearchHandler.searchFilesFromPeer(searchQuery, peer);
+                Map<String, Map.Entry<String, String>> peerFiles = fileSearchHandler.searchFilesFromPeer(searchQuery, peer);
 
                 if (!peerFiles.isEmpty()) {
                     allFoundFiles.putAll(peerFiles);

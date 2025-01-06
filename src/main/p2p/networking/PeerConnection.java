@@ -156,11 +156,14 @@ public class PeerConnection {
                 rootOnly
             );
 
-        Map<String, String> foundFiles = fileSearchManager.searchFiles(query);
+        Map<String, Map.Entry<String, String>> foundFiles = fileSearchManager.searchFiles(query);
 
         StringBuilder response = new StringBuilder();
-        for (Map.Entry<String, String> entry : foundFiles.entrySet()) {
-            response.append(entry.getKey()).append(",");
+        for (Map.Entry<String, Map.Entry<String, String>> entry : foundFiles.entrySet()) {
+            String relativePath = entry.getKey();
+            String fileName = entry.getValue().getKey();
+            String hash = entry.getValue().getValue();
+            response.append(relativePath).append("|").append(hash).append(",");
         }
 
         String responseString = response.length() > 0
