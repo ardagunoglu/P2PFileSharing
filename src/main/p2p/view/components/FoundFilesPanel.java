@@ -27,8 +27,8 @@ public class FoundFilesPanel extends AbstractListPanel {
 
     public void updateFoundFilesList(Map<String, Map.Entry<String, String>> files) {
         DefaultListModel<String> model = new DefaultListModel<>();
-        Map<String, Integer> filePathCounts = new HashMap<>();
         Map<String, Integer> displayNameCounts = new HashMap<>();
+
         fileHashMap.clear();
 
         for (Map.Entry<String, Map.Entry<String, String>> entry : files.entrySet()) {
@@ -37,8 +37,6 @@ public class FoundFilesPanel extends AbstractListPanel {
             String fileHash = entry.getValue().getValue();
 
             fileHashMap.put(fullPath, entry.getValue());
-
-            filePathCounts.put(fullPath, filePathCounts.getOrDefault(fullPath, 0) + 1);
 
             displayNameCounts.put(fileName, displayNameCounts.getOrDefault(fileName, 0) + 1);
         }
@@ -49,12 +47,10 @@ public class FoundFilesPanel extends AbstractListPanel {
             int count = displayNameCounts.get(fileName);
 
             String displayName = count > 1
-                    ? fileName + " (" + filePathCounts.get(fullPath) + ")"
-                    : fileName;
+                ? fileName + " (" + count + ")"
+                : fileName;
 
-            if (!model.contains(displayName)) {
-                model.addElement(displayName);
-            }
+            model.addElement(displayName);
         }
 
         getList().setModel(model);

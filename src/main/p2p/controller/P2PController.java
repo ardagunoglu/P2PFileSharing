@@ -155,6 +155,8 @@ public class P2PController {
             view.getFoundFilesPanel().clearList();
 
             Map<String, Map.Entry<String, String>> foundFiles = searchFilesFromPeers(searchQuery);
+            
+            System.out.println(foundFiles.size());
 
             if (foundFiles.isEmpty()) {
                 JOptionPane.showMessageDialog(view, "No files found matching the query: " + searchQuery);
