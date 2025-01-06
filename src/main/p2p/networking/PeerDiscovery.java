@@ -111,6 +111,8 @@ public class PeerDiscovery {
                         sendResponse(senderAddress, receivedPacket.getPort());
                     } else if (receivedData.startsWith("P2P_DISCONNECT")) {
                         handleDisconnectMessage(receivedData, senderAddress);
+                    } else if (receivedData.equals("P2P_FINALIZED")) {
+                        handleFinalizedMessage(senderAddress);
                     } else {
                         processResponse(receivedData, senderAddress);
                     }
@@ -208,6 +210,18 @@ public class PeerDiscovery {
         }
     }
 
+    private void handleFinalizedMessage(InetAddress senderAddress) {
+        synchronized (discoveredPeers) {
+            Peer finalizedPeer = new Peer(senderAddress.getHostAddress(), senderAddress.getHostAddress(), DISCOVERY_PORT);
+
+            if (discoveredPeers.contains(finalizedPeer)) {
+                System.out.println("P2P_FINALIZED received from peer: " + finalizedPeer);
+            } else {
+                System.out.println("P2P_FINALIZED received, but peer not found: " + finalizedPeer);
+            }
+        }
+    }
+    
     private String generatePeerId(InetAddress address, int port) {
         return address.getHostAddress() + ":" + port;
     }
