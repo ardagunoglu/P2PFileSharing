@@ -137,10 +137,23 @@ public class P2PController {
                 return;
             }
 
-            Set<String> foundFiles = searchFilesFromPeers();
+            String searchQuery = view.getSearchPanel().getSearchField().getText().trim();
+
+            if (searchQuery.isEmpty()) {
+                JOptionPane.showMessageDialog(view, "Search field cannot be empty!");
+                return;
+            }
+
+            Set<String> foundFiles = searchFilesFromPeers(searchQuery);
             view.getFoundFilesPanel().updateFoundFilesList(foundFiles);
-            JOptionPane.showMessageDialog(view, "Search completed. Found files are displayed.");
+
+            if (foundFiles.isEmpty()) {
+                JOptionPane.showMessageDialog(view, "No files found matching the query: " + searchQuery);
+            } else {
+                JOptionPane.showMessageDialog(view, "Search completed. Found files are displayed.");
+            }
         });
+
     }
 
     private void updateDelFolderButtonState() {
@@ -164,13 +177,12 @@ public class P2PController {
         view.setVisible(true);
     }
     
-    private Set<String> searchFilesFromPeers() {
+    private Set<String> searchFilesFromPeers(String searchQuery) {
         Set<String> foundFiles = new HashSet<>();
         
         for (Peer peer : peerDiscovery.getfoundPeers()) {
             // Mock search logic - replace this with actual file discovery request/response
             foundFiles.add("File1 from " + peer.getPeerId());
-            foundFiles.add("File2 from " + peer.getPeerId());
         }
         
         return foundFiles;
