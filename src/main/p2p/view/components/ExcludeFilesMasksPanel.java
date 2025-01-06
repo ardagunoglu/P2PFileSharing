@@ -2,7 +2,6 @@ package main.p2p.view.components;
 
 import java.awt.BorderLayout;
 import java.awt.Dimension;
-
 import javax.swing.*;
 
 public class ExcludeFilesMasksPanel extends AbstractSettingsSection {
@@ -28,16 +27,21 @@ public class ExcludeFilesMasksPanel extends AbstractSettingsSection {
         buttonPanel.add(Box.createRigidArea(new Dimension(0, 5)));
         buttonPanel.add(delFileMasksButton);
 
+        JScrollPane scrollPane = new JScrollPane(excludeFilesMasksList);
+        scrollPane.setPreferredSize(new Dimension(150, 90));
+        scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        scrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
+
         JPanel listAndButtonsPanel = new JPanel(new BorderLayout(5, 5));
-        listAndButtonsPanel.add(new JScrollPane(excludeFilesMasksList), BorderLayout.CENTER);
+        listAndButtonsPanel.add(scrollPane, BorderLayout.CENTER);
         listAndButtonsPanel.add(buttonPanel, BorderLayout.EAST);
-        
+
         this.delFileMasksButton.setEnabled(false);
-        
+
         addFileMasksButton.setPreferredSize(const_dimension_button);
         addFileMasksButton.setMinimumSize(const_dimension_button);
         addFileMasksButton.setMaximumSize(const_dimension_button);
-        
+
         delFileMasksButton.setPreferredSize(const_dimension_button);
         delFileMasksButton.setMinimumSize(const_dimension_button);
         delFileMasksButton.setMaximumSize(const_dimension_button);

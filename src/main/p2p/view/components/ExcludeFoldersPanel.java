@@ -2,7 +2,6 @@ package main.p2p.view.components;
 
 import java.awt.BorderLayout;
 import java.awt.Dimension;
-
 import javax.swing.*;
 
 public class ExcludeFoldersPanel extends AbstractSettingsSection {
@@ -28,16 +27,21 @@ public class ExcludeFoldersPanel extends AbstractSettingsSection {
         buttonPanel.add(Box.createRigidArea(new Dimension(0, 5)));
         buttonPanel.add(delFolderButton);
 
+        JScrollPane scrollPane = new JScrollPane(excludeFoldersList);
+        scrollPane.setPreferredSize(new Dimension(150, 125));
+        scrollPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        scrollPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
+
         JPanel listAndButtonsPanel = new JPanel(new BorderLayout(5, 5));
-        listAndButtonsPanel.add(new JScrollPane(excludeFoldersList), BorderLayout.CENTER);
+        listAndButtonsPanel.add(scrollPane, BorderLayout.CENTER);
         listAndButtonsPanel.add(buttonPanel, BorderLayout.EAST);
-        
+
         this.delFolderButton.setEnabled(false);
-        
+
         addFolderButton.setPreferredSize(const_dimension_button);
         addFolderButton.setMinimumSize(const_dimension_button);
         addFolderButton.setMaximumSize(const_dimension_button);
-        
+
         delFolderButton.setPreferredSize(const_dimension_button);
         delFolderButton.setMinimumSize(const_dimension_button);
         delFolderButton.setMaximumSize(const_dimension_button);

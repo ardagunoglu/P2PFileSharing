@@ -42,7 +42,13 @@ public class P2PController {
     	    view.getDisconnectMenuItem().setEnabled(true);
 
     	    try {
-    	    	peerConnection = new PeerConnection(model, this, view.getSettingsPanel().getExcludeFilesMasksPanel().getExcludeFilesMasksList());
+    	    	peerConnection = new PeerConnection(
+    	    			model,
+    	    			this,
+    	    			view.getSettingsPanel().getExcludeFilesMasksPanel().getExcludeFilesMasksList(),
+    	    			view.getSettingsPanel().getFolderExclusionPanel().getExcludeFoldersPanel().getExcludeFoldersList(),
+    	    			view.getSettingsPanel().getFolderExclusionPanel().getRootOnlyCheckBox().isSelected()
+    	    		);
     	    	 if (!model.getPeers().stream().anyMatch(peer -> peer.getPeerId().equals("local_peer"))) {
     	             Peer localPeer = new Peer("local_peer", NetworkUtils.getLocalAddress().getHostAddress(), 4000);
     	             model.addPeer(localPeer);
@@ -90,6 +96,8 @@ public class P2PController {
             view.getSettingsPanel().getFolderExclusionPanel().getExcludeFoldersPanel().getExcludeFoldersList().setEnabled(!selected);
             view.getSettingsPanel().getFolderExclusionPanel().getExcludeFoldersPanel().getAddFolderButton().setEnabled(!selected);
             view.getSettingsPanel().getFolderExclusionPanel().getExcludeFoldersPanel().setEnabled(!selected);
+            
+            peerConnection.setRootOnly(selected);
 
             if (selected) {
                 ((DefaultListModel<String>) view.getSettingsPanel().getFolderExclusionPanel().getExcludeFoldersPanel().getExcludeFoldersList().getModel()).clear();

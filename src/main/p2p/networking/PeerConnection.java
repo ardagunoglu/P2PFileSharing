@@ -25,10 +25,12 @@ public class PeerConnection {
     private DatagramSocket socket;
     private P2PController controller;
     private final JList<String> excludeFilesMasksList;
+    private final JList<String> excludeFoldersList;
+    private boolean rootOnly;
     
     private final CountDownLatch disconnectLatch = new CountDownLatch(1);
 
-    public PeerConnection(P2PModel model, P2PController controller, JList<String> excludeFilesMasksList) {
+    public PeerConnection(P2PModel model, P2PController controller, JList<String> excludeFilesMasksList, JList<String> excludeFoldersList, boolean rootOnly) {
         this.model = model;
         try {
             this.socket = new DatagramSocket(CONNECTION_PORT);
@@ -38,6 +40,8 @@ public class PeerConnection {
         }
         this.controller = controller;
         this.excludeFilesMasksList = excludeFilesMasksList;
+        this.excludeFoldersList = excludeFoldersList;
+        this.rootOnly = rootOnly;
     }
 
     public void connectPeers() {
@@ -146,7 +150,9 @@ public class PeerConnection {
 
         FileSearchManager fileSearchManager = new FileSearchManager(
                 new File(model.getSharedFolderPath()),
-                excludeFilesMasksList
+                excludeFilesMasksList,
+                excludeFoldersList,
+                rootOnly
             );
 
         List<String> foundFiles = fileSearchManager.searchFiles(query);
@@ -182,7 +188,9 @@ public class PeerConnection {
         }
     }
     
-    
+    public void setRootOnly(boolean rootOnly) {
+    	this.rootOnly = rootOnly;
+    }
     
     private void sendFinalizedMessage(String peerAddress, int peerPort) {
         new Thread(() -> {
