@@ -28,6 +28,7 @@ public class FoundFilesPanel extends AbstractListPanel {
     public void updateFoundFilesList(Map<String, Map.Entry<String, String>> files) {
         DefaultListModel<String> model = new DefaultListModel<>();
         Map<String, Integer> displayNameCounts = new HashMap<>();
+        Map<String, Integer> fileOccurrences = new HashMap<>();
 
         fileHashMap.clear();
 
@@ -38,16 +39,20 @@ public class FoundFilesPanel extends AbstractListPanel {
 
             fileHashMap.put(fullPath, entry.getValue());
 
-            displayNameCounts.put(fileName, displayNameCounts.getOrDefault(fileName, 0) + 1);
+            fileOccurrences.put(fileName, fileOccurrences.getOrDefault(fileName, 0) + 1);
         }
 
+        Map<String, Integer> currentDisplayCounts = new HashMap<>();
         for (Map.Entry<String, Map.Entry<String, String>> entry : files.entrySet()) {
             String fullPath = entry.getKey();
             String fileName = fullPath.substring(fullPath.lastIndexOf("/") + 1);
-            int count = displayNameCounts.get(fileName);
+            int occurrenceCount = fileOccurrences.get(fileName);
 
-            String displayName = count > 1
-                ? fileName + " (" + count + ")"
+            currentDisplayCounts.put(fileName, currentDisplayCounts.getOrDefault(fileName, 0) + 1);
+            int currentCount = currentDisplayCounts.get(fileName);
+
+            String displayName = (occurrenceCount > 1)
+                ? fileName + " (" + currentCount + ")"
                 : fileName;
 
             model.addElement(displayName);
