@@ -27,26 +27,34 @@ public class FoundFilesPanel extends AbstractListPanel {
 
     public void updateFoundFilesList(Map<String, Map.Entry<String, String>> files) {
         DefaultListModel<String> model = new DefaultListModel<>();
-        Map<String, Integer> fileNameCounts = new HashMap<>();
-
+        Map<String, Integer> filePathCounts = new HashMap<>();
+        Map<String, Integer> displayNameCounts = new HashMap<>();
         fileHashMap.clear();
 
         for (Map.Entry<String, Map.Entry<String, String>> entry : files.entrySet()) {
-            String filePath = entry.getKey();
-            String fileName = filePath.substring(filePath.lastIndexOf("/") + 1);
+            String fullPath = entry.getKey();
+            String fileName = fullPath.substring(fullPath.lastIndexOf("/") + 1);
             String fileHash = entry.getValue().getValue();
 
-            fileHashMap.put(filePath, entry.getValue());
+            fileHashMap.put(fullPath, entry.getValue());
 
-            fileNameCounts.put(fileName, fileNameCounts.getOrDefault(fileName, 0) + 1);
+            filePathCounts.put(fullPath, filePathCounts.getOrDefault(fullPath, 0) + 1);
+
+            displayNameCounts.put(fileName, displayNameCounts.getOrDefault(fileName, 0) + 1);
         }
 
-        for (Map.Entry<String, Integer> entry : fileNameCounts.entrySet()) {
-            String fileName = entry.getKey();
-            int count = entry.getValue();
+        for (Map.Entry<String, Map.Entry<String, String>> entry : files.entrySet()) {
+            String fullPath = entry.getKey();
+            String fileName = fullPath.substring(fullPath.lastIndexOf("/") + 1);
+            int count = displayNameCounts.get(fileName);
 
-            String displayName = count > 1 ? fileName + " (" + count + ")" : fileName;
-            model.addElement(displayName);
+            String displayName = count > 1
+                    ? fileName + " (" + filePathCounts.get(fullPath) + ")"
+                    : fileName;
+
+            if (!model.contains(displayName)) {
+                model.addElement(displayName);
+            }
         }
 
         getList().setModel(model);
