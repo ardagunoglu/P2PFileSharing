@@ -13,17 +13,17 @@ import java.util.concurrent.CountDownLatch;
 
 import javax.swing.SwingUtilities;
 
-public class PeerDiscovery {
+public class PeerConnection {
     private static final int DISCOVERY_PORT = 4000;
     private final P2PModel model;
-    private final Set<Peer> discoveredPeers = new HashSet<>();
+    private final Set<Peer> foundPeers = new HashSet<>();
     private boolean running = true;
     private DatagramSocket socket;
     private P2PController controller;
     
     private final CountDownLatch disconnectLatch = new CountDownLatch(1);
 
-    public PeerDiscovery(P2PModel model, P2PController controller) {
+    public PeerConnection(P2PModel model, P2PController controller) {
         this.model = model;
         try {
             this.socket = new DatagramSocket(DISCOVERY_PORT);
@@ -55,7 +55,7 @@ public class PeerDiscovery {
     private void sendDiscoveryMessage() {
         new Thread(() -> {
             try {
-                String discoveryMessage = "P2P_DISCOVERY";
+                String discoveryMessage = MessageType.P2P_CONNECT_ME.getValue();
                 DatagramPacket packet = new DatagramPacket(
                         discoveryMessage.getBytes(),
                         discoveryMessage.length(),
@@ -75,7 +75,7 @@ public class PeerDiscovery {
     public void sendDisconnectMessage() {
         new Thread(() -> {
             try {
-                String disconnectMessage = "P2P_DISCONNECT";
+                String disconnectMessage = MessageType.P2P_DISCONNECT.getValue();
                 DatagramPacket packet = new DatagramPacket(
                         disconnectMessage.getBytes(),
                         disconnectMessage.length(),
@@ -86,8 +86,8 @@ public class PeerDiscovery {
                 socket.send(packet);
                 System.out.println("Disconnect message sent to all peers.");
 
-                synchronized (discoveredPeers) {
-                    discoveredPeers.clear();
+                synchronized (foundPeers) {
+                    foundPeers.clear();
                     model.getPeerGraph().getAllPeers().forEach(model::removePeer);
                     System.out.println("Cleared local peers and graph.");
                 }
@@ -95,7 +95,7 @@ public class PeerDiscovery {
             } catch (Exception e) {
                 System.err.println("Error sending disconnect message: " + e.getMessage());
             } finally {
-                disconnectLatch.countDown(); // Signal that disconnect message has been sent
+                disconnectLatch.countDown();
             }
         }).start();
     }
@@ -121,14 +121,24 @@ public class PeerDiscovery {
 
                     System.out.println("Received data: " + receivedData + " from " + senderAddress);
 
-                    if (receivedData.equals("P2P_DISCOVERY")) {
-                        sendResponse(senderAddress, receivedPacket.getPort());
-                    } else if (receivedData.startsWith("P2P_DISCONNECT")) {
-                        handleDisconnectMessage(receivedData, senderAddress);
-                    } else if (receivedData.equals("P2P_FINALIZED")) {
-                        handleFinalizedMessage(senderAddress);
-                    } else {
-                        processResponse(receivedData, senderAddress);
+                    try {
+                        MessageType messageType = MessageType.fromString(receivedData);
+                        switch (messageType) {
+                            case P2P_CONNECT_ME:
+                                sendResponse(senderAddress, receivedPacket.getPort());
+                                break;
+                            case P2P_DISCONNECT:
+                                handleDisconnectMessage(receivedData, senderAddress);
+                                break;
+                            case P2P_FINALIZED:
+                                handleFinalizedMessage(senderAddress);
+                                break;
+                            case P2P_RESPONSE:
+                                processResponse(receivedData, senderAddress);
+                                break;
+                        }
+                    } catch (IllegalArgumentException e) {
+                        System.out.println("Unknown message type received: " + receivedData);
                     }
                 }
             } catch (Exception e) {
@@ -142,8 +152,8 @@ public class PeerDiscovery {
     private void handleDisconnectMessage(String message, InetAddress senderAddress) {
         Peer disconnectingPeer = new Peer(senderAddress.getHostAddress(), senderAddress.getHostAddress(), DISCOVERY_PORT);
 
-        synchronized (discoveredPeers) {
-            if (discoveredPeers.remove(disconnectingPeer)) {
+        synchronized (foundPeers) {
+            if (foundPeers.remove(disconnectingPeer)) {
                 model.removePeer(disconnectingPeer);
                 model.getPeerGraph().removePeer(disconnectingPeer);
                 System.out.println("Peer disconnected: " + disconnectingPeer);
@@ -155,7 +165,7 @@ public class PeerDiscovery {
     private void sendFinalizedMessage(String peerAddress, int peerPort) {
         new Thread(() -> {
             try {
-                String finalizedMessage = "P2P_FINALIZED";
+                String finalizedMessage = MessageType.P2P_FINALIZED.getValue();
                 DatagramPacket packet = new DatagramPacket(
                         finalizedMessage.getBytes(),
                         finalizedMessage.length(),
@@ -173,7 +183,7 @@ public class PeerDiscovery {
     private void sendResponse(InetAddress requesterAddress, int requesterPort) {
         new Thread(() -> {
             try {
-                String responseMessage = "P2P_RESPONSE";
+                String responseMessage = MessageType.P2P_RESPONSE.getValue();
                 DatagramPacket responsePacket = new DatagramPacket(
                         responseMessage.getBytes(),
                         responseMessage.length(),
@@ -190,16 +200,11 @@ public class PeerDiscovery {
     }
 
     private void processResponse(String responseData, InetAddress senderAddress) throws SocketException {
-        if (!responseData.equals("P2P_RESPONSE")) {
-            System.out.println("Invalid response message received: " + responseData);
-            return;
-        }
-
         Peer newPeer = new Peer(senderAddress.getHostAddress(), senderAddress.getHostAddress(), DISCOVERY_PORT);
 
-        synchronized (discoveredPeers) {
-            if (!discoveredPeers.contains(newPeer)) {
-                discoveredPeers.add(newPeer);
+        synchronized (foundPeers) {
+            if (!foundPeers.contains(newPeer)) {
+                foundPeers.add(newPeer);
                 model.addPeer(newPeer);
 
                 Peer localPeer = model.getPeers().stream()
@@ -221,11 +226,11 @@ public class PeerDiscovery {
     }
 
     private void handleFinalizedMessage(InetAddress senderAddress) {
-        synchronized (discoveredPeers) {
+        synchronized (foundPeers) {
             Peer finalizedPeer = new Peer(senderAddress.getHostAddress(), senderAddress.getHostAddress(), DISCOVERY_PORT);
 
-            if (!discoveredPeers.contains(finalizedPeer)) {
-                discoveredPeers.add(finalizedPeer);
+            if (!foundPeers.contains(finalizedPeer)) {
+                foundPeers.add(finalizedPeer);
                 model.addPeer(finalizedPeer);
 
                 Peer localPeer = model.getPeers().stream()
@@ -235,17 +240,12 @@ public class PeerDiscovery {
 
                 model.addConnection(localPeer, finalizedPeer);
 
-                System.out.println("P2P_FINALIZED received and peer re-added: " + finalizedPeer);
+                System.out.println(MessageType.P2P_FINALIZED.getValue() + " received and peer re-added: " + finalizedPeer);
                 controller.updateUIList();
             } else {
-                System.out.println("P2P_FINALIZED received from already known peer: " + finalizedPeer);
+                System.out.println(MessageType.P2P_FINALIZED.getValue() + " received from already known peer: " + finalizedPeer);
             }
         }
-    }
-
-    
-    private String generatePeerId(InetAddress address, int port) {
-        return address.getHostAddress() + ":" + port;
     }
 
     public void stopDiscovery() {
@@ -263,7 +263,7 @@ public class PeerDiscovery {
         }
     }
 
-    public Set<Peer> getDiscoveredPeers() {
-        return discoveredPeers;
+    public Set<Peer> getfoundPeers() {
+        return foundPeers;
     }
 }

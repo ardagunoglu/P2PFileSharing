@@ -4,7 +4,7 @@ import main.p2p.model.FileChunk;
 import main.p2p.model.P2PModel;
 import main.p2p.model.Peer;
 import main.p2p.networking.FileTransferManager;
-import main.p2p.networking.PeerDiscovery;
+import main.p2p.networking.PeerConnection;
 import main.p2p.util.NetworkUtils;
 import main.p2p.view.P2PView;
 
@@ -20,7 +20,7 @@ public class P2PController {
     private final P2PModel model;
     private final P2PView view;
     private final FileTransferManager fileTransferManager;
-    private PeerDiscovery peerDiscovery;
+    private PeerConnection peerDiscovery;
     private final ExecutorService executorService;
 
     public P2PController() {
@@ -40,7 +40,7 @@ public class P2PController {
     	    view.getDisconnectMenuItem().setEnabled(true);
 
     	    try {
-    	    	peerDiscovery = new PeerDiscovery(model, this);
+    	    	peerDiscovery = new PeerConnection(model, this);
     	    	 if (!model.getPeers().stream().anyMatch(peer -> peer.getPeerId().equals("local_peer"))) {
     	             Peer localPeer = new Peer("local_peer", NetworkUtils.getLocalAddress().getHostAddress(), 4000);
     	             model.addPeer(localPeer);
