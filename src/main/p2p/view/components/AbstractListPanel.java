@@ -5,15 +5,18 @@ import java.awt.*;
 
 public abstract class AbstractListPanel extends JPanel {
     private final JList<String> list;
+    private final JScrollPane scrollPane;
 
     public AbstractListPanel(String title) {
         this.setLayout(new BorderLayout(5, 5));
         this.setBorder(BorderFactory.createTitledBorder(title));
 
         list = new JList<>(new DefaultListModel<>());
-        JScrollPane scrollPane = new JScrollPane(list);
+        scrollPane = new JScrollPane(list);
 
         this.add(scrollPane, BorderLayout.CENTER);
+
+        this.setPreferredSize(new Dimension(700, 150));
     }
 
     public JList<String> getList() {
@@ -22,12 +25,14 @@ public abstract class AbstractListPanel extends JPanel {
 
     public void addElement(String element) {
         ((DefaultListModel<String>) list.getModel()).addElement(element);
+        onElementAdded(element);
     }
 
     public void removeSelectedElement() {
         int selectedIndex = list.getSelectedIndex();
         if (selectedIndex != -1) {
-            ((DefaultListModel<String>) list.getModel()).remove(selectedIndex);
+            String removedElement = ((DefaultListModel<String>) list.getModel()).remove(selectedIndex);
+            onElementRemoved(removedElement);
         }
     }
 

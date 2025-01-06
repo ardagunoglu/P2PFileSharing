@@ -87,6 +87,8 @@ public class P2PView extends JFrame {
         mainPanel.add(foundFilesPanel, gbc);
 
         gbc.gridy = 5;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.weighty = 0.0;
         mainPanel.add(searchPanel, gbc);
 
         JPanel contentPanel = new JPanel(new BorderLayout(10, 10));

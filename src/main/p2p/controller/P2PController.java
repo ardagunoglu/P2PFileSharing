@@ -27,7 +27,6 @@ public class P2PController {
         model = new P2PModel();
         view = new P2PView();
         fileTransferManager = new FileTransferManager();
-        peerDiscovery = new PeerDiscovery(model, this);
         executorService = Executors.newCachedThreadPool();
 
         initializeListeners();
@@ -41,11 +40,13 @@ public class P2PController {
     	    view.getDisconnectMenuItem().setEnabled(true);
 
     	    try {
+    	    	peerDiscovery = new PeerDiscovery(model, this);
     	    	 if (!model.getPeers().stream().anyMatch(peer -> peer.getPeerId().equals("local_peer"))) {
     	             Peer localPeer = new Peer("local_peer", NetworkUtils.getLocalAddress().getHostAddress(), 4000);
     	             model.addPeer(localPeer);
     	         }
     	        peerDiscovery.discoverPeers();
+    	        JOptionPane.showMessageDialog(view, "Connected P2P network");
     	    } catch (Exception ex) {
     	        JOptionPane.showMessageDialog(view, "Failed to connect: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
     	    }

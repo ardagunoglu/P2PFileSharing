@@ -9,6 +9,7 @@ import java.net.*;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 
 import javax.swing.SwingUtilities;
 
@@ -19,6 +20,8 @@ public class PeerDiscovery {
     private boolean running = true;
     private DatagramSocket socket;
     private P2PController controller;
+    
+    private final CountDownLatch disconnectLatch = new CountDownLatch(1);
 
     public PeerDiscovery(P2PModel model, P2PController controller) {
         this.model = model;
@@ -32,6 +35,16 @@ public class PeerDiscovery {
     }
 
     public void discoverPeers() {
+        if (socket == null || socket.isClosed()) {
+            try {
+                socket = new DatagramSocket(DISCOVERY_PORT);
+                socket.setBroadcast(true);
+                System.out.println("Socket reinitialized for discovery.");
+            } catch (SocketException e) {
+                throw new RuntimeException("Error reinitializing socket: " + e.getMessage(), e);
+            }
+        }
+
         sendDiscoveryMessage();
 
         if (running) {
@@ -81,6 +94,8 @@ public class PeerDiscovery {
                 controller.updateUIList();
             } catch (Exception e) {
                 System.err.println("Error sending disconnect message: " + e.getMessage());
+            } finally {
+                disconnectLatch.countDown(); // Signal that disconnect message has been sent
             }
         }).start();
     }
@@ -235,8 +250,16 @@ public class PeerDiscovery {
 
     public void stopDiscovery() {
         running = false;
-        if (socket != null && !socket.isClosed()) {
-            socket.close();
+        try {
+            disconnectLatch.await();
+
+            if (socket != null && !socket.isClosed()) {
+                socket.close();
+                System.out.println("Socket closed during stopDiscovery.");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            System.err.println("Interrupted while waiting for disconnect to complete: " + e.getMessage());
         }
     }
 
