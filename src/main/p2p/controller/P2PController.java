@@ -3,15 +3,17 @@ package main.p2p.controller;
 import main.p2p.model.FileChunk;
 import main.p2p.model.P2PModel;
 import main.p2p.model.Peer;
+import main.p2p.networking.FileSearchHandler;
 import main.p2p.networking.FileTransferManager;
 import main.p2p.networking.PeerConnection;
 import main.p2p.util.NetworkUtils;
 import main.p2p.view.P2PView;
 
 import javax.swing.*;
-import java.awt.*;
 import java.io.File;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -144,13 +146,13 @@ public class P2PController {
                 return;
             }
 
-            Set<String> foundFiles = searchFilesFromPeers(searchQuery);
-            view.getFoundFilesPanel().updateFoundFilesList(foundFiles);
+            Map<String, Peer> foundFiles = searchFilesFromPeers(searchQuery);
 
             if (foundFiles.isEmpty()) {
                 JOptionPane.showMessageDialog(view, "No files found matching the query: " + searchQuery);
             } else {
-                JOptionPane.showMessageDialog(view, "Search completed. Found files are displayed.");
+                JOptionPane.showMessageDialog(view, "Search completed. Files found and listed.");
+                view.getFoundFilesPanel().updateFoundFilesList(foundFiles); // Pass the map to the panel
             }
         });
     }
@@ -176,18 +178,17 @@ public class P2PController {
         view.setVisible(true);
     }
     
-    private Set<String> searchFilesFromPeers(String searchQuery) {
-        Set<String> foundFiles = new HashSet<>();
-        
+    private Map<String, Peer> searchFilesFromPeers(String searchQuery) {
+        Map<String, Peer> allFoundFiles = new HashMap<>();
+        FileSearchHandler fileSearchHandler = new FileSearchHandler();
+
         for (Peer peer : model.getPeerGraph().getAllPeers()) {
             if (!peer.getPeerId().equals("local_peer")) {
-                // TODO: Mock search logic - replace with actual file search logic
-                foundFiles.add(searchQuery + " from " + peer.getIpAddress());
+                Map<String, Peer> peerFiles = fileSearchHandler.searchFilesFromPeer(searchQuery, peer);
+                allFoundFiles.putAll(peerFiles); // Merge results into the main map
             }
         }
-        
-        return foundFiles;
+
+        return allFoundFiles;
     }
-
-
 }

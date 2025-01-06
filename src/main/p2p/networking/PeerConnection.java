@@ -1,13 +1,16 @@
 package main.p2p.networking;
 
 import main.p2p.controller.P2PController;
+import main.p2p.file.FileSearchManager;
 import main.p2p.model.P2PModel;
 import main.p2p.model.Peer;
 import main.p2p.util.NetworkUtils;
 
+import java.io.File;
 import java.net.*;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 
@@ -147,6 +150,37 @@ public class PeerConnection {
             }
         }).start();
     }
+    
+    private void listenForSearchRequests() {
+        new Thread(() -> {
+            while (running) {
+                try {
+                    byte[] buffer = new byte[1024];
+                    DatagramPacket receivedPacket = new DatagramPacket(buffer, buffer.length);
+                    socket.receive(receivedPacket);
+
+                    String message = new String(receivedPacket.getData(), 0, receivedPacket.getLength());
+                    if (message.startsWith("SEARCH:")) {
+                        String query = message.substring(7).trim();
+                        List<String> results = new FileSearchManager(new File(model.getSharedFolderPath())).searchFiles(query);
+
+                        // Send results back to the requester
+                        String response = String.join(",", results);
+                        DatagramPacket responsePacket = new DatagramPacket(
+                                response.getBytes(),
+                                response.length(),
+                                receivedPacket.getAddress(),
+                                receivedPacket.getPort()
+                        );
+                        socket.send(responsePacket);
+                    }
+                } catch (Exception e) {
+                    System.err.println("Error processing search request: " + e.getMessage());
+                }
+            }
+        }).start();
+    }
+
 
     private void handleDisconnectMessage(String message, InetAddress senderAddress) {
         Peer disconnectingPeer = new Peer(senderAddress.getHostAddress(), senderAddress.getHostAddress(), CONNECTION_PORT);

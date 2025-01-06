@@ -3,7 +3,7 @@ package main.p2p.view.components;
 import main.p2p.model.Peer;
 
 import javax.swing.*;
-import java.util.Set;
+import java.util.Map;
 
 public class FoundFilesPanel extends AbstractListPanel {
 
@@ -21,10 +21,11 @@ public class FoundFilesPanel extends AbstractListPanel {
         System.out.println("Found file removed: " + element);
     }
 
-    public void updateFoundFilesList(Set<String> files) {
+    public void updateFoundFilesList(Map<String, Peer> files) {
         DefaultListModel<String> model = new DefaultListModel<>();
-        for (String file : files) {
-            model.addElement(file);
+        for (Map.Entry<String, Peer> entry : files.entrySet()) {
+            String fileDisplay = entry.getKey() + " (from " + entry.getValue().getIpAddress() + ")";
+            model.addElement(fileDisplay);
         }
         getList().setModel(model);
     }
