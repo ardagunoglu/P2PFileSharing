@@ -72,7 +72,7 @@ public class PeerDiscovery {
 
                 socket.send(packet);
                 System.out.println("Disconnect message sent to all peers.");
-                
+
                 synchronized (discoveredPeers) {
                     discoveredPeers.clear();
                     model.getPeerGraph().getAllPeers().forEach(model::removePeer);
@@ -84,7 +84,6 @@ public class PeerDiscovery {
             }
         }).start();
     }
-
 
     private void listenForResponses() {
         new Thread(() -> {
@@ -126,18 +125,14 @@ public class PeerDiscovery {
     }
 
     private void handleDisconnectMessage(String message, InetAddress senderAddress) {
-        String[] parts = message.split(":");
-        if (parts.length == 3) {
-            String peerId = parts[1];
-            Peer disconnectingPeer = new Peer(peerId, senderAddress.getHostAddress(), DISCOVERY_PORT);
+        Peer disconnectingPeer = new Peer(senderAddress.getHostAddress(), senderAddress.getHostAddress(), DISCOVERY_PORT);
 
-            synchronized (discoveredPeers) {
-                if (discoveredPeers.remove(disconnectingPeer)) {
-                    model.removePeer(disconnectingPeer);
-                    model.getPeerGraph().removePeer(disconnectingPeer);
-                    System.out.println("Peer disconnected: " + disconnectingPeer);
-                    controller.updateUIList();
-                }
+        synchronized (discoveredPeers) {
+            if (discoveredPeers.remove(disconnectingPeer)) {
+                model.removePeer(disconnectingPeer);
+                model.getPeerGraph().removePeer(disconnectingPeer);
+                System.out.println("Peer disconnected: " + disconnectingPeer);
+                controller.updateUIList();
             }
         }
     }
@@ -188,7 +183,7 @@ public class PeerDiscovery {
         Peer newPeer = new Peer(senderAddress.getHostAddress(), senderAddress.getHostAddress(), DISCOVERY_PORT);
 
         synchronized (discoveredPeers) {
-            if (!discoveredPeers.contains(newPeer) && !newPeer.getPeerId().equals("local_peer")) {
+            if (!discoveredPeers.contains(newPeer)) {
                 discoveredPeers.add(newPeer);
                 model.addPeer(newPeer);
 
@@ -205,7 +200,7 @@ public class PeerDiscovery {
 
                 controller.updateUIList();
             } else {
-                System.out.println("Peer already exists or is local_peer: " + newPeer);
+                System.out.println("Peer already exists: " + newPeer);
             }
         }
     }
@@ -214,13 +209,25 @@ public class PeerDiscovery {
         synchronized (discoveredPeers) {
             Peer finalizedPeer = new Peer(senderAddress.getHostAddress(), senderAddress.getHostAddress(), DISCOVERY_PORT);
 
-            if (discoveredPeers.contains(finalizedPeer)) {
-                System.out.println("P2P_FINALIZED received from peer: " + finalizedPeer);
+            if (!discoveredPeers.contains(finalizedPeer)) {
+                discoveredPeers.add(finalizedPeer);
+                model.addPeer(finalizedPeer);
+
+                Peer localPeer = model.getPeers().stream()
+                    .filter(peer -> peer.getPeerId().equals("local_peer"))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("local_peer not found in the graph"));
+
+                model.addConnection(localPeer, finalizedPeer);
+
+                System.out.println("P2P_FINALIZED received and peer re-added: " + finalizedPeer);
+                controller.updateUIList();
             } else {
-                System.out.println("P2P_FINALIZED received, but peer not found: " + finalizedPeer);
+                System.out.println("P2P_FINALIZED received from already known peer: " + finalizedPeer);
             }
         }
     }
+
     
     private String generatePeerId(InetAddress address, int port) {
         return address.getHostAddress() + ":" + port;
