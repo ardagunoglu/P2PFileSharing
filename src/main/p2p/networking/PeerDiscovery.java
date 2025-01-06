@@ -161,7 +161,7 @@ public class PeerDiscovery {
     private void sendResponse(InetAddress requesterAddress, int requesterPort) {
         new Thread(() -> {
             try {
-                String responseMessage = "P2P_RESPONSE" + generatePeerId(requesterAddress, DISCOVERY_PORT);
+                String responseMessage = "P2P_RESPONSE";
                 DatagramPacket responsePacket = new DatagramPacket(
                         responseMessage.getBytes(),
                         responseMessage.length(),
@@ -178,30 +178,32 @@ public class PeerDiscovery {
     }
 
     private void processResponse(String responseData, InetAddress senderAddress) throws SocketException {
-        String[] parts = responseData.split(":");
-        if (parts.length == 3) {
-            String peerId = parts[1];
-            String peerAddress = senderAddress.getHostAddress();
-            int peerPort = Integer.parseInt(parts[2]);
+        if (!responseData.equals("P2P_RESPONSE")) {
+            System.out.println("Invalid response message received: " + responseData);
+            return;
+        }
 
-            Peer newPeer = new Peer(peerId, peerAddress, peerPort);
+        Peer newPeer = new Peer(senderAddress.getHostAddress(), senderAddress.getHostAddress(), DISCOVERY_PORT);
 
-            synchronized (discoveredPeers) {
-                if (!discoveredPeers.contains(newPeer)) {
-                    discoveredPeers.add(newPeer);
-                    model.addPeer(newPeer);
+        synchronized (discoveredPeers) {
+            if (!discoveredPeers.contains(newPeer) && !newPeer.getPeerId().equals("local_peer")) {
+                discoveredPeers.add(newPeer);
+                model.addPeer(newPeer);
 
-                    Peer localPeer = new Peer(peerId, NetworkUtils.getLocalAddress().getHostAddress(), DISCOVERY_PORT);
-                    model.addConnection(localPeer, newPeer);
+                Peer localPeer = model.getPeers().stream()
+                    .filter(peer -> peer.getPeerId().equals("local_peer"))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("local_peer not found in the graph"));
 
-                    System.out.println("Discovered and connected peer: " + newPeer);
+                model.addConnection(localPeer, newPeer);
 
-                    sendFinalizedMessage(peerAddress, peerPort);
-                    
-                    controller.updateUIList();
-                } else {
-                    System.out.println("Peer already exists: " + newPeer);
-                }
+                System.out.println("Discovered and connected peer: " + newPeer);
+
+                sendFinalizedMessage(newPeer.getIpAddress(), newPeer.getPort());
+
+                controller.updateUIList();
+            } else {
+                System.out.println("Peer already exists or is local_peer: " + newPeer);
             }
         }
     }

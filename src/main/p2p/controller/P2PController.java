@@ -41,6 +41,10 @@ public class P2PController {
     	    view.getDisconnectMenuItem().setEnabled(true);
 
     	    try {
+    	    	 if (!model.getPeers().stream().anyMatch(peer -> peer.getPeerId().equals("local_peer"))) {
+    	             Peer localPeer = new Peer("local_peer", NetworkUtils.getLocalAddress().getHostAddress(), 4000);
+    	             model.addPeer(localPeer);
+    	         }
     	        peerDiscovery.discoverPeers();
     	    } catch (Exception ex) {
     	        JOptionPane.showMessageDialog(view, "Failed to connect: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
@@ -158,8 +162,14 @@ public class P2PController {
     }
     
     public void updateUIList() {
-    	SwingUtilities.invokeLater(() -> {
-            view.getFoundFilesPanel().updatePeersList(new HashSet<>(model.getPeers()));
+        SwingUtilities.invokeLater(() -> {
+            Set<Peer> filteredPeers = new HashSet<>();
+            for (Peer peer : model.getPeers()) {
+                if (!peer.getPeerId().equals("local_peer")) {
+                    filteredPeers.add(peer);
+                }
+            }
+            view.getFoundFilesPanel().updatePeersList(filteredPeers);
         });
     }
 }
