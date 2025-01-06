@@ -25,37 +25,39 @@ public class FoundFilesPanel extends AbstractListPanel {
         System.out.println("Found file removed: " + element);
     }
 
-    public void updateFoundFilesList(Map<String, Map.Entry<String, String>> files) {
+    public void updateFoundFilesList(Map<String, Map.Entry<String, Peer>> files) {
         DefaultListModel<String> model = new DefaultListModel<>();
-        Map<String, Integer> displayNameCounts = new HashMap<>();
         Map<String, Integer> fileOccurrences = new HashMap<>();
+        Map<String, Integer> currentDisplayCounts = new HashMap<>();
 
         fileHashMap.clear();
 
-        for (Map.Entry<String, Map.Entry<String, String>> entry : files.entrySet()) {
+        for (Map.Entry<String, Map.Entry<String, Peer>> entry : files.entrySet()) {
             String fullPath = entry.getKey();
             String fileName = fullPath.substring(fullPath.lastIndexOf("/") + 1);
-            String fileHash = entry.getValue().getValue();
+            String peerIp = entry.getValue().getValue().getIpAddress();
 
-            fileHashMap.put(fullPath, entry.getValue());
+            String uniqueKey = fileName + "@" + peerIp;
+            fileOccurrences.put(uniqueKey, fileOccurrences.getOrDefault(uniqueKey, 0) + 1);
 
-            fileOccurrences.put(fileName, fileOccurrences.getOrDefault(fileName, 0) + 1);
+            fileHashMap.put(fullPath, Map.entry(fileName, peerIp));
         }
 
-        Map<String, Integer> currentDisplayCounts = new HashMap<>();
-        for (Map.Entry<String, Map.Entry<String, String>> entry : files.entrySet()) {
+        for (Map.Entry<String, Map.Entry<String, Peer>> entry : files.entrySet()) {
             String fullPath = entry.getKey();
             String fileName = fullPath.substring(fullPath.lastIndexOf("/") + 1);
-            int occurrenceCount = fileOccurrences.get(fileName);
+            String peerIp = entry.getValue().getValue().getIpAddress();
 
-            currentDisplayCounts.put(fileName, currentDisplayCounts.getOrDefault(fileName, 0) + 1);
-            int currentCount = currentDisplayCounts.get(fileName);
+            String uniqueKey = fileName + "@" + peerIp;
 
-            String displayName = (occurrenceCount > 1)
+            currentDisplayCounts.put(uniqueKey, currentDisplayCounts.getOrDefault(uniqueKey, 0) + 1);
+            int currentCount = currentDisplayCounts.get(uniqueKey);
+
+            String displayName = fileOccurrences.get(uniqueKey) > 1
                 ? fileName + " (" + currentCount + ")"
                 : fileName;
 
-            model.addElement(displayName);
+            model.addElement(displayName + " from " + peerIp);
         }
 
         getList().setModel(model);
