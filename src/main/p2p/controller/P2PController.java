@@ -20,7 +20,7 @@ public class P2PController {
     private final P2PModel model;
     private final P2PView view;
     private final FileTransferManager fileTransferManager;
-    private PeerConnection peerDiscovery;
+    private PeerConnection peerConnection;
     private final ExecutorService executorService;
 
     public P2PController() {
@@ -40,12 +40,12 @@ public class P2PController {
     	    view.getDisconnectMenuItem().setEnabled(true);
 
     	    try {
-    	    	peerDiscovery = new PeerConnection(model, this);
+    	    	peerConnection = new PeerConnection(model, this);
     	    	 if (!model.getPeers().stream().anyMatch(peer -> peer.getPeerId().equals("local_peer"))) {
     	             Peer localPeer = new Peer("local_peer", NetworkUtils.getLocalAddress().getHostAddress(), 4000);
     	             model.addPeer(localPeer);
     	         }
-    	        peerDiscovery.connectPeers();
+    	        peerConnection.connectPeers();
     	        JOptionPane.showMessageDialog(view, "Connected P2P network");
     	    } catch (Exception ex) {
     	        JOptionPane.showMessageDialog(view, "Failed to connect: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
@@ -57,9 +57,9 @@ public class P2PController {
             view.getConnectMenuItem().setEnabled(true);
             view.getDisconnectMenuItem().setEnabled(false);
 
-            peerDiscovery.sendDisconnectMessage();
+            peerConnection.sendDisconnectMessage();
             model.getPeers().forEach(model::removePeer);
-            peerDiscovery.stopConnection();
+            peerConnection.stopConnection();
             JOptionPane.showMessageDialog(view, "Disconnected from P2P network");
         });
 
@@ -153,7 +153,6 @@ public class P2PController {
                 JOptionPane.showMessageDialog(view, "Search completed. Found files are displayed.");
             }
         });
-
     }
 
     private void updateDelFolderButtonState() {
@@ -180,12 +179,15 @@ public class P2PController {
     private Set<String> searchFilesFromPeers(String searchQuery) {
         Set<String> foundFiles = new HashSet<>();
         
-        for (Peer peer : peerDiscovery.getfoundPeers()) {
-            // Mock search logic - replace this with actual file discovery request/response
-        	foundFiles.add(searchQuery + " from " + peer.getIpAddress());
+        for (Peer peer : model.getPeerGraph().getAllPeers()) {
+            if (!peer.getPeerId().equals("local_peer")) {
+                // TODO: Mock search logic - replace with actual file search logic
+                foundFiles.add(searchQuery + " from " + peer.getIpAddress());
+            }
         }
         
         return foundFiles;
     }
+
 
 }
