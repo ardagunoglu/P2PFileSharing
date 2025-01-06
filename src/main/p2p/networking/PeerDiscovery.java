@@ -1,5 +1,6 @@
 package main.p2p.networking;
 
+import main.p2p.controller.P2PController;
 import main.p2p.model.P2PModel;
 import main.p2p.model.Peer;
 import main.p2p.util.NetworkUtils;
@@ -9,14 +10,17 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
+import javax.swing.SwingUtilities;
+
 public class PeerDiscovery {
     private static final int DISCOVERY_PORT = 4000;
     private final P2PModel model;
     private final Set<Peer> discoveredPeers = new HashSet<>();
     private boolean running = true;
     private DatagramSocket socket;
+    private P2PController controller;
 
-    public PeerDiscovery(P2PModel model) {
+    public PeerDiscovery(P2PModel model, P2PController controller) {
         this.model = model;
         try {
             this.socket = new DatagramSocket(DISCOVERY_PORT);
@@ -24,6 +28,7 @@ public class PeerDiscovery {
         } catch (SocketException e) {
             throw new RuntimeException("Error initializing socket: " + e.getMessage(), e);
         }
+        this.controller = controller;
     }
 
     public void discoverPeers() {
@@ -146,6 +151,8 @@ public class PeerDiscovery {
                     System.out.println("Discovered and connected peer: " + newPeer);
 
                     sendFinalizedMessage(peerAddress, peerPort);
+                    
+                    controller.updateUIList();
                 } else {
                     System.out.println("Peer already exists: " + newPeer);
                 }

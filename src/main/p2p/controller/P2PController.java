@@ -27,7 +27,7 @@ public class P2PController {
         model = new P2PModel();
         view = new P2PView();
         fileTransferManager = new FileTransferManager();
-        peerDiscovery = new PeerDiscovery(model);
+        peerDiscovery = new PeerDiscovery(model, this);
         executorService = Executors.newCachedThreadPool();
 
         initializeListeners();
@@ -42,20 +42,6 @@ public class P2PController {
 
     	    try {
     	        peerDiscovery.discoverPeers();
-
-    	        new Thread(() -> {
-    	            try {
-    	                while (model.isConnected()) {
-    	                    SwingUtilities.invokeLater(() -> {
-    	                        view.getFoundFilesPanel().updatePeersList(new HashSet<>(model.getPeers()));
-    	                    });
-    	                    Thread.sleep(20000);
-    	                }
-    	                peerDiscovery.stopDiscovery();
-    	            } catch (Exception ex) {
-    	                JOptionPane.showMessageDialog(view, "Error discovering peers: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-    	            }
-    	        }).start();
     	    } catch (Exception ex) {
     	        JOptionPane.showMessageDialog(view, "Failed to connect: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
     	    }
@@ -167,5 +153,11 @@ public class P2PController {
 
     public void showGUI() {
         view.setVisible(true);
+    }
+    
+    public void updateUIList() {
+    	SwingUtilities.invokeLater(() -> {
+            view.getFoundFilesPanel().updatePeersList(new HashSet<>(model.getPeers()));
+        });
     }
 }
