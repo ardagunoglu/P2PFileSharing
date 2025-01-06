@@ -2,6 +2,7 @@ package main.p2p.networking;
 
 import main.p2p.model.P2PModel;
 import main.p2p.model.Peer;
+import main.p2p.util.NetworkUtils;
 
 import java.net.*;
 import java.util.Collections;
@@ -13,21 +14,29 @@ public class PeerDiscovery {
     private final P2PModel model;
     private final Set<Peer> discoveredPeers = new HashSet<>();
     private boolean running = true;
+    private DatagramSocket socket;
 
     public PeerDiscovery(P2PModel model) {
         this.model = model;
+        try {
+            this.socket = new DatagramSocket(DISCOVERY_PORT);
+            this.socket.setBroadcast(true);
+        } catch (SocketException e) {
+            throw new RuntimeException("Error initializing socket: " + e.getMessage(), e);
+        }
     }
 
     public void discoverPeers() {
         sendDiscoveryMessage();
 
-        listenForResponses();
+        if (running) {
+            listenForResponses();
+        }
     }
 
     private void sendDiscoveryMessage() {
         new Thread(() -> {
-            try (DatagramSocket socket = new DatagramSocket()) {
-                socket.setBroadcast(true);
+            try {
                 String discoveryMessage = "P2P_DISCOVERY";
                 DatagramPacket packet = new DatagramPacket(
                         discoveryMessage.getBytes(),
@@ -39,11 +48,6 @@ public class PeerDiscovery {
                 socket.send(packet);
                 System.out.println("Discovery message sent to broadcast address.");
 
-                byte[] buffer = new byte[1024];
-                DatagramPacket responsePacket = new DatagramPacket(buffer, buffer.length);
-                socket.receive(responsePacket);
-
-                processResponse(new String(responsePacket.getData(), 0, responsePacket.getLength()), responsePacket.getAddress());
             } catch (Exception e) {
                 System.err.println("Error sending discovery message: " + e.getMessage());
             }
@@ -52,16 +56,14 @@ public class PeerDiscovery {
 
     private void listenForResponses() {
         new Thread(() -> {
-            try (DatagramSocket listenerSocket = new DatagramSocket(DISCOVERY_PORT)) {
-                System.out.println("Listening for peers on port " + DISCOVERY_PORT);
-
-                InetAddress localAddress = getLocalAddress();
+            try {
+                InetAddress localAddress = NetworkUtils.getLocalAddress();
                 System.out.println("Local address detected: " + localAddress);
 
                 while (running) {
                     byte[] buffer = new byte[1024];
                     DatagramPacket receivedPacket = new DatagramPacket(buffer, buffer.length);
-                    listenerSocket.receive(receivedPacket);
+                    socket.receive(receivedPacket);
 
                     String receivedData = new String(receivedPacket.getData(), 0, receivedPacket.getLength());
                     InetAddress senderAddress = receivedPacket.getAddress();
@@ -80,15 +82,16 @@ public class PeerDiscovery {
                     }
                 }
             } catch (Exception e) {
-                System.err.println("Error in listener socket: " + e.getMessage());
+                if (running) {
+                    System.err.println("Error in listener socket: " + e.getMessage());
+                }
             }
         }).start();
     }
 
-
     private void sendFinalizedMessage(String peerAddress, int peerPort) {
         new Thread(() -> {
-            try (DatagramSocket socket = new DatagramSocket()) {
+            try {
                 String finalizedMessage = "P2P_FINALIZED";
                 DatagramPacket packet = new DatagramPacket(
                         finalizedMessage.getBytes(),
@@ -106,13 +109,13 @@ public class PeerDiscovery {
 
     private void sendResponse(InetAddress requesterAddress, int requesterPort) {
         new Thread(() -> {
-            try (DatagramSocket socket = new DatagramSocket()) {
+            try {
                 String responseMessage = "P2P_RESPONSE:" + generatePeerId(requesterAddress, DISCOVERY_PORT);
                 DatagramPacket responsePacket = new DatagramPacket(
-                    responseMessage.getBytes(),
-                    responseMessage.length(),
-                    requesterAddress,
-                    requesterPort
+                        responseMessage.getBytes(),
+                        responseMessage.length(),
+                        requesterAddress,
+                        requesterPort
                 );
 
                 socket.send(responsePacket);
@@ -122,26 +125,8 @@ public class PeerDiscovery {
             }
         }).start();
     }
-    
-    private InetAddress getLocalAddress() throws SocketException {
-        for (NetworkInterface networkInterface : Collections.list(NetworkInterface.getNetworkInterfaces())) {
-            if (networkInterface.isLoopback() || networkInterface.isVirtual() || !networkInterface.isUp()) {
-                continue;
-            }
 
-            for (InetAddress address : Collections.list(networkInterface.getInetAddresses())) {
-                if (address instanceof Inet4Address && !address.isLoopbackAddress()) {
-                    if (address.getHostAddress().startsWith("192.168.1.")) {
-                        return address;
-                    }
-                }
-            }
-        }
-        throw new SocketException("No suitable local address found");
-    }
-
-
-    private void processResponse(String responseData, InetAddress senderAddress) {
+    private void processResponse(String responseData, InetAddress senderAddress) throws SocketException {
         String[] parts = responseData.split(":");
         if (parts.length == 3) {
             String peerId = parts[1];
@@ -151,27 +136,32 @@ public class PeerDiscovery {
             Peer newPeer = new Peer(peerId, peerAddress, peerPort);
 
             synchronized (discoveredPeers) {
-                if (discoveredPeers.contains(newPeer)) {
-                	discoveredPeers.remove(newPeer);
-                    model.removePeer(newPeer);
-                    System.out.println("Removed duplicate peer: " + newPeer);
+                if (!discoveredPeers.contains(newPeer)) {
+                    discoveredPeers.add(newPeer);
+                    model.addPeer(newPeer);
+
+                    Peer localPeer = new Peer(peerId, NetworkUtils.getLocalAddress().getHostAddress(), DISCOVERY_PORT);
+                    model.addConnection(localPeer, newPeer);
+
+                    System.out.println("Discovered and connected peer: " + newPeer);
+
+                    sendFinalizedMessage(peerAddress, peerPort);
+                } else {
+                    System.out.println("Peer already exists: " + newPeer);
                 }
-
-                discoveredPeers.add(newPeer);
-                model.addPeer(newPeer);
-                System.out.println("Discovered peer: " + newPeer);
-
-                sendFinalizedMessage(peerAddress, peerPort);
             }
         }
     }
-    
+
     private String generatePeerId(InetAddress address, int port) {
         return address.getHostAddress() + ":" + port;
     }
 
     public void stopDiscovery() {
         running = false;
+        if (socket != null && !socket.isClosed()) {
+            socket.close();
+        }
     }
 
     public Set<Peer> getDiscoveredPeers() {

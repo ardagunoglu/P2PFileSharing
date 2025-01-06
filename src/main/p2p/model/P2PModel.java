@@ -1,13 +1,12 @@
 package main.p2p.model;
 
-import java.util.HashSet;
 import java.util.Set;
 
 public class P2PModel {
     private String sharedFolderPath = "C:\\My Shared Folder\\";
     private String destinationPath = "C:\\P2P Downloads\\";
     private boolean isConnected = false;
-    private final Set<Peer> peers = new HashSet<>();
+    private final PeerGraph peerGraph = new PeerGraph();
 
     public String getSharedFolderPath() {
         return sharedFolderPath;
@@ -33,35 +32,39 @@ public class P2PModel {
         isConnected = connected;
     }
 
-    public Set<Peer> getPeers() {
-        return new HashSet<>(peers);
-    }
-
     public void addPeer(Peer peer) {
-        if (peers.add(peer)) {
-            System.out.println("New peer added: " + peer);
-        }
+        peerGraph.addPeer(peer);
+        System.out.println("New peer added: " + peer);
     }
 
-    public void clearPeers() {
-        peers.clear();
-    }
-
-    public void setPeers(Set<Peer> newPeers) {
-        peers.clear();
-        peers.addAll(newPeers);
+    public void addConnection(Peer peer1, Peer peer2) {
+        peerGraph.addConnection(peer1, peer2);
+        System.out.println("Connection added between: " + peer1 + " and " + peer2);
     }
 
     public void removePeer(Peer peer) {
-        synchronized (peers) {
-            peers.remove(peer);
-            System.out.println("Removed peer from model: " + peer);
-        }
+        peerGraph.removePeer(peer);
+        System.out.println("Peer removed: " + peer);
+    }
+
+    public void removeConnection(Peer peer1, Peer peer2) {
+        peerGraph.removeConnection(peer1, peer2);
+        System.out.println("Connection removed between: " + peer1 + " and " + peer2);
+    }
+
+    public PeerGraph getPeerGraph() {
+        return peerGraph;
+    }
+    
+    public Set<Peer> getPeers() {
+        return peerGraph.getAllPeers();
     }
 
     @Override
     public String toString() {
-        return String.format("P2PModel{sharedFolderPath='%s', destinationPath='%s', isConnected=%s, peers=%s}",
-                sharedFolderPath, destinationPath, isConnected, peers);
+        return String.format(
+            "P2PModel{sharedFolderPath='%s', destinationPath='%s', isConnected=%s, graph=%s}",
+            sharedFolderPath, destinationPath, isConnected, peerGraph
+        );
     }
 }
