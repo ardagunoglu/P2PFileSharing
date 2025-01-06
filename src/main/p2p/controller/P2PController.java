@@ -137,7 +137,9 @@ public class P2PController {
                 return;
             }
 
-            JOptionPane.showMessageDialog(view, "Searching for files...");
+            Set<String> foundFiles = searchFilesFromPeers();
+            view.getFoundFilesPanel().updateFoundFilesList(foundFiles);
+            JOptionPane.showMessageDialog(view, "Search completed. Found files are displayed.");
         });
     }
 
@@ -162,15 +164,16 @@ public class P2PController {
         view.setVisible(true);
     }
     
-    public void updateUIList() {
-        SwingUtilities.invokeLater(() -> {
-            Set<Peer> filteredPeers = new HashSet<>();
-            for (Peer peer : model.getPeers()) {
-                if (!peer.getPeerId().equals("local_peer")) {
-                    filteredPeers.add(peer);
-                }
-            }
-            view.getFoundFilesPanel().updatePeersList(filteredPeers);
-        });
+    private Set<String> searchFilesFromPeers() {
+        Set<String> foundFiles = new HashSet<>();
+        
+        for (Peer peer : peerDiscovery.getfoundPeers()) {
+            // Mock search logic - replace this with actual file discovery request/response
+            foundFiles.add("File1 from " + peer.getPeerId());
+            foundFiles.add("File2 from " + peer.getPeerId());
+        }
+        
+        return foundFiles;
     }
+
 }

@@ -91,7 +91,6 @@ public class PeerConnection {
                     model.getPeerGraph().getAllPeers().forEach(model::removePeer);
                     System.out.println("Cleared local peers and graph.");
                 }
-                controller.updateUIList();
             } catch (Exception e) {
                 System.err.println("Error sending disconnect message: " + e.getMessage());
             } finally {
@@ -157,7 +156,6 @@ public class PeerConnection {
                 model.removePeer(disconnectingPeer);
                 model.getPeerGraph().removePeer(disconnectingPeer);
                 System.out.println("Peer disconnected: " + disconnectingPeer);
-                controller.updateUIList();
             }
         }
     }
@@ -217,8 +215,6 @@ public class PeerConnection {
                 System.out.println("Connected, connected peer: " + newPeer);
 
                 sendFinalizedMessage(newPeer.getIpAddress(), newPeer.getPort());
-
-                controller.updateUIList();
             } else {
                 System.out.println("Peer already exists: " + newPeer);
             }
@@ -241,7 +237,6 @@ public class PeerConnection {
                 model.addConnection(localPeer, finalizedPeer);
 
                 System.out.println(MessageType.P2P_FINALIZED.getValue() + " received and peer re-added: " + finalizedPeer);
-                controller.updateUIList();
             } else {
                 System.out.println(MessageType.P2P_FINALIZED.getValue() + " received from already known peer: " + finalizedPeer);
             }

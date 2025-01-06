@@ -21,10 +21,10 @@ public class FoundFilesPanel extends AbstractListPanel {
         System.out.println("Found file removed: " + element);
     }
 
-    public void updatePeersList(Set<Peer> peers) {
+    public void updateFoundFilesList(Set<String> files) {
         DefaultListModel<String> model = new DefaultListModel<>();
-        for (Peer peer : peers) {
-            model.addElement(peer.toString());
+        for (String file : files) {
+            model.addElement(file);
         }
         getList().setModel(model);
     }
