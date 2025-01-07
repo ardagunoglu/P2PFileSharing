@@ -19,7 +19,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import javax.swing.JList;
 import javax.swing.SwingUtilities;
@@ -31,6 +34,9 @@ public class PeerConnection {
     private final List<Map.Entry<Peer, String>> matchFoundPeers = new ArrayList<>();
     private final Map<String, Map.Entry<String, String>> nearestFile = new HashMap<>();
     private final BlockingQueue<DatagramPacket> packetQueue = new LinkedBlockingQueue<>();
+    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+    private int lastMatchCount = 0;
+    private boolean isMonitoringMatches = false;
     private boolean running = true;
     private DatagramSocket socket;
     private P2PController controller;
@@ -260,10 +266,40 @@ public class PeerConnection {
                 }
 
                 System.out.println("MATCH_FOUND: File " + filePath + " available from peer " + matchingPeer.getIpAddress());
+
+                if (!isMonitoringMatches) {
+                    startMatchMonitoring();
+                }
             }
         } catch (Exception e) {
             System.err.println("Error handling MATCH_FOUND: " + e.getMessage());
         }
+    }
+    
+    private void startMatchMonitoring() {
+        isMonitoringMatches = true;
+        scheduler.scheduleAtFixedRate(() -> {
+            synchronized (matchFoundPeers) {
+                if (matchFoundPeers.size() > 0 && matchFoundPeers.size() == lastMatchCount) {
+                    System.out.println("All peers have sent match data. Processing can begin.");
+                    processMatchFoundPeers();
+                    stopMatchMonitoring();
+                } else {
+                    lastMatchCount = matchFoundPeers.size();
+                }
+            }
+        }, 0, 2, TimeUnit.SECONDS);
+    }
+    
+    private void stopMatchMonitoring() {
+        scheduler.shutdownNow();
+        isMonitoringMatches = false;
+        lastMatchCount = 0;
+    }
+    
+    private void processMatchFoundPeers() {
+        System.out.println("Processing matched peers: " + matchFoundPeers);
+        matchFoundPeers.clear();
     }
     
     public List<Map.Entry<Peer, String>> getMatchFoundPeers() {
