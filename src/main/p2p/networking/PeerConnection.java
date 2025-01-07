@@ -179,6 +179,8 @@ public class PeerConnection {
             handleHashQuery(receivedData.substring(11), senderAddress, packet.getPort());
         } else if (receivedData.startsWith("MATCH_FOUND:")) {
             handleMatchFound(receivedData, senderAddress);
+        } else if(receivedData.startsWith("REQUEST_CHUNK:")) {
+            handleChunkRequest(receivedData.substring(14), senderAddress, packet.getPort());
         } else {
             try {
 				handlePeerConnectionMessages(receivedData, packet, senderAddress);
@@ -243,6 +245,35 @@ public class PeerConnection {
         }
     }
 
+    private void handleChunkRequest(String requestData, InetAddress senderAddress, int senderPort) {
+        try {
+            String[] parts = requestData.split("\\|");
+            if (parts.length == 2) {
+                String filePath = parts[0];
+                int chunkIndex = Integer.parseInt(parts[1]);
+
+                FileManager fileManager = new FileManager(filePath);
+                int totalChunks = fileManager.getTotalChunks();
+                byte[] chunkData = fileManager.getChunk(chunkIndex);
+
+                // Send RESPONSE_CHUNK
+                String responseMessage = "RESPONSE_CHUNK:" + filePath + "|" + chunkIndex + "|" + totalChunks;
+                DatagramPacket responsePacket = new DatagramPacket(
+                        responseMessage.getBytes(),
+                        responseMessage.length(),
+                        senderAddress,
+                        senderPort
+                );
+
+                socket.send(responsePacket);
+                System.out.println("Sent RESPONSE_CHUNK for file: " + filePath + ", chunk index: " + chunkIndex);
+            } else {
+                System.err.println("Invalid REQUEST_CHUNK format.");
+            }
+        } catch (Exception e) {
+            System.err.println("Error handling chunk request: " + e.getMessage());
+        }
+    }
     
     private int calculatePathDepth(String filePath) {
         String normalizedPath = filePath.replaceAll("^/|/$", "");
@@ -317,11 +348,79 @@ public class PeerConnection {
     
     private void processMatchFoundPeersForFile(String filePath) {
         synchronized (matchFoundPeers) {
-            System.out.println("Current matchFoundPeers for file: " + filePath);
+            System.out.println("Processing matched peers for file: " + filePath);
+
             for (Map.Entry<Peer, String> entry : matchFoundPeers) {
-                System.out.println("Peer: " + entry.getKey() + ", File Path: " + entry.getValue());
+                Peer peer = entry.getKey();
+                String matchedFilePath = entry.getValue();
+
+                if (filePath.equals(matchedFilePath)) {
+                    try {
+                        requestChunksFromPeer(peer, filePath);
+                    } catch (Exception e) {
+                        System.err.println("Error requesting chunks from peer: " + peer + " (" + e.getMessage() + ")");
+                    }
+                }
             }
         }
+    }
+    
+    private void requestChunksFromPeer(Peer peer, String filePath) {
+        new Thread(() -> {
+            int chunkIndex = 0;
+            int totalChunks = Integer.MAX_VALUE;
+
+            while (chunkIndex < totalChunks) {
+                try {
+                    String requestMessage = "REQUEST_CHUNK:" + filePath + "|" + chunkIndex;
+                    DatagramPacket requestPacket = new DatagramPacket(
+                            requestMessage.getBytes(),
+                            requestMessage.length(),
+                            InetAddress.getByName(peer.getIpAddress()),
+                            peer.getPort()
+                    );
+
+                    socket.send(requestPacket);
+                    System.out.println("Sent REQUEST_CHUNK to peer: " + peer.getIpAddress() + " for chunk index: " + chunkIndex);
+
+                    DatagramPacket responsePacket = receiveResponse();
+                    String responseData = new String(responsePacket.getData(), 0, responsePacket.getLength());
+
+                    if (responseData.startsWith("RESPONSE_CHUNK:")) {
+                        String[] parts = responseData.substring(15).split("\\|");
+                        if (parts.length == 3) {
+                            String receivedFilePath = parts[0];
+                            int receivedIndex = Integer.parseInt(parts[1]);
+                            totalChunks = Integer.parseInt(parts[2]);
+
+                            if (receivedFilePath.equals(filePath) && receivedIndex == chunkIndex) {
+                                System.out.println("Received chunk index: " + receivedIndex + " for file: " + filePath);
+                                chunkIndex++;
+                            } else {
+                                System.err.println("Mismatch in received chunk data.");
+                            }
+                        } else {
+                            System.err.println("Invalid RESPONSE_CHUNK format.");
+                        }
+                    } else {
+                        System.err.println("Unexpected response: " + responseData);
+                    }
+
+                } catch (Exception e) {
+                    System.err.println("Error during chunk request/response cycle: " + e.getMessage());
+                    break;
+                }
+            }
+
+            System.out.println("All chunks requested and received for file: " + filePath);
+        }).start();
+    }
+    
+    private DatagramPacket receiveResponse() throws IOException {
+        byte[] buffer = new byte[4096];
+        DatagramPacket responsePacket = new DatagramPacket(buffer, buffer.length);
+        socket.receive(responsePacket);
+        return responsePacket;
     }
     
     public List<Map.Entry<Peer, String>> getMatchFoundPeers() {
