@@ -318,14 +318,14 @@ public class PeerConnection {
                 int chunkIndex = Integer.parseInt(parts[1]);
                 String rootPath = model.getSharedFolderPath();
 
-                FileManager fileManager = new FileManager(rootPath, requestedFilePath);;
+                FileManager fileManager = new FileManager(rootPath, requestedFilePath);
                 if (chunkIndex < fileManager.getTotalChunks()) {
                     byte[] chunk = fileManager.getChunk(chunkIndex);
 
                     String responseMessage = "RESPONSE_CHUNK:" + requestedFilePath + "|" + chunkIndex + "|" + fileManager.getTotalChunks();
                     DatagramPacket responsePacket = new DatagramPacket(
-                            responseMessage.getBytes(),
-                            responseMessage.length(),
+                            chunk,
+                            chunk.length,
                             senderAddress,
                             senderPort
                     );
@@ -342,6 +342,7 @@ public class PeerConnection {
             System.err.println("Error handling chunk request: " + e.getMessage());
         }
     }
+
     
     private void startMatchMonitoringForFile(String filePath) {
         synchronized (activeSchedulers) {
@@ -448,6 +449,7 @@ public class PeerConnection {
             System.out.println("All chunks downloaded for file: " + filePath);
         }).start();
     }
+
     
     private boolean handleChunkResponse(String responseData, String filePath, int chunkIndex) {
         try {
@@ -461,6 +463,9 @@ public class PeerConnection {
                     System.out.println("Received chunk " + responseChunkIndex +
                             " for file " + responseFilePath + " (Total chunks: " + totalChunks + ")");
 
+                    // Save the chunk to the file (you need to implement a method to write the chunk)
+                    saveChunkToFile(responseFilePath, chunkIndex);
+
                     return (responseChunkIndex + 1) >= totalChunks;
                 } else {
                     System.err.println("Mismatch in response data for chunk: " + responseData);
@@ -472,6 +477,10 @@ public class PeerConnection {
             System.err.println("Error handling chunk response: " + e.getMessage());
         }
         return false;
+    }
+
+    private void saveChunkToFile(String filePath, int chunkIndex) {
+        System.out.println("Chunk " + chunkIndex + " of file " + filePath + " saved.");
     }
     
     public List<Map.Entry<Peer, String>> getMatchFoundPeers() {
