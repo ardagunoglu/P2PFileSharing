@@ -37,6 +37,8 @@ public class PeerConnection {
     private final Map<String, Map.Entry<String, String>> nearestFile = new HashMap<>();
     private final BlockingQueue<DatagramPacket> packetQueue = new LinkedBlockingQueue<>();
     private final Map<String, ScheduledExecutorService> activeSchedulers = new HashMap<>();
+    private final Map<String, Map<Integer, byte[]>> receivedChunksMap = new HashMap<>();
+    private final Map<String, Integer> totalChunksMap = new HashMap<>();
     private boolean running = true;
     private DatagramSocket socket;
     private P2PController controller;
@@ -183,14 +185,44 @@ public class PeerConnection {
             handleMatchFound(receivedData, senderAddress);
         } else if(receivedData.startsWith("REQUEST_CHUNK:")) {
             handleChunkRequest(receivedData.substring(14), senderAddress, packet.getPort());
-        } else if(receivedData.startsWith("RESPONSE_CHUNK:")) {
-        	
+        } else if (receivedData.startsWith("RESPONSE_CHUNK:")) {
+            handleChunkResponse(receivedData.substring(15));
         } else {
             try {
 				handlePeerConnectionMessages(receivedData, packet, senderAddress);
 			} catch (SocketException e) {
 				e.printStackTrace();
 			}
+        }
+    }
+    
+    private void handleChunkResponse(String responseData) {
+        try {
+            String[] parts = responseData.split("\\|", 4);
+            if (parts.length == 4) {
+                String filePath = parts[0];
+                int chunkIndex = Integer.parseInt(parts[1]);
+                int totalChunks = Integer.parseInt(parts[2]);
+                byte[] chunkData = Base64.getDecoder().decode(parts[3]);
+
+                synchronized (receivedChunksMap) {
+                    receivedChunksMap.putIfAbsent(filePath, new HashMap<>());
+                    receivedChunksMap.get(filePath).put(chunkIndex, chunkData);
+                    totalChunksMap.put(filePath, totalChunks);
+                }
+
+                System.out.println("Received chunk " + chunkIndex + " for file " + filePath);
+
+                // Check if all chunks are received
+                if (receivedChunksMap.get(filePath).size() == totalChunks) {
+                    System.out.println("All chunks received for file: " + filePath);
+                    reassembleFile(filePath);
+                }
+            } else {
+                System.err.println("Invalid RESPONSE_CHUNK format.");
+            }
+        } catch (Exception e) {
+            System.err.println("Error handling RESPONSE_CHUNK: " + e.getMessage());
         }
     }
     
@@ -375,11 +407,11 @@ public class PeerConnection {
     private void requestChunksFromPeer(Peer peer, String filePath) {
         new Thread(() -> {
             int chunkIndex = 0;
-            int totalChunks = Integer.MAX_VALUE;
-            Map<Integer, byte[]> receivedChunks = new HashMap<>();
-            final int timeout = 5000;
+            synchronized (totalChunksMap) {
+                totalChunksMap.put(filePath, Integer.MAX_VALUE);
+            }
 
-            while (chunkIndex < totalChunks) {
+            while (true) {
                 try {
                     String requestMessage = "REQUEST_CHUNK:" + filePath + "|" + chunkIndex;
                     DatagramPacket requestPacket = new DatagramPacket(
@@ -392,75 +424,46 @@ public class PeerConnection {
                     socket.send(requestPacket);
                     System.out.println("Sent REQUEST_CHUNK to peer: " + peer.getIpAddress() + " for chunk index: " + chunkIndex);
 
-                    DatagramPacket responsePacket = receiveResponseWithTimeout(timeout);
-                    if (responsePacket == null) {
-                        System.err.println("Timeout waiting for RESPONSE_CHUNK for chunk index: " + chunkIndex);
-                        break;
-                    }
+                    Thread.sleep(1000);
 
-                    String responseData = new String(responsePacket.getData(), 0, responsePacket.getLength());
-                    if (responseData.startsWith("RESPONSE_CHUNK:")) {
-                        String[] parts = responseData.substring(15).split("\\|", 4);
-                        if (parts.length == 4) {
-                            String receivedFilePath = parts[0];
-                            int receivedIndex = Integer.parseInt(parts[1]);
-                            totalChunks = Integer.parseInt(parts[2]);
-                            byte[] chunkData = Base64.getDecoder().decode(parts[3]);
+                    synchronized (receivedChunksMap) {
+                        Map<Integer, byte[]> chunks = receivedChunksMap.get(filePath);
+                        Integer totalChunks = totalChunksMap.get(filePath);
 
-                            if (receivedFilePath.equals(filePath) && receivedIndex == chunkIndex) {
-                                receivedChunks.put(receivedIndex, chunkData);
-                                System.out.println("Received chunk index: " + receivedIndex + " for file: " + filePath);
-                                chunkIndex++;
-                            } else {
-                                System.err.println("Mismatch in received chunk data.");
+                        if (chunks != null && totalChunks != null) {
+                            if (chunks.size() == totalChunks) {
+                                System.out.println("All chunks received for file: " + filePath);
+                                reassembleFile(filePath);
+                                break;
                             }
-                        } else {
-                            System.err.println("Invalid RESPONSE_CHUNK format.");
+                            if (chunks.containsKey(chunkIndex)) {
+                                chunkIndex++;
+                            }
                         }
-                    } else {
-                        System.err.println("Unexpected response: " + responseData);
                     }
-
                 } catch (Exception e) {
-                    System.err.println("Error during chunk request/response cycle: " + e.getMessage());
+                    System.err.println("Error requesting chunk: " + e.getMessage());
                     break;
                 }
             }
-
-            if (receivedChunks.size() == totalChunks) {
-                reassembleFile(filePath, receivedChunks);
-            } else {
-                System.err.println("Failed to receive all chunks for file: " + filePath);
-            }
         }).start();
     }
+
     
-    private DatagramPacket receiveResponseWithTimeout(int timeout) {
-        try {
-            socket.setSoTimeout(timeout);
-            byte[] buffer = new byte[65536];
-            DatagramPacket responsePacket = new DatagramPacket(buffer, buffer.length);
-            socket.receive(responsePacket);
-            socket.setSoTimeout(0);
-            return responsePacket;
-        } catch (SocketTimeoutException e) {
-            System.err.println("Socket timeout while waiting for response.");
-            return null;
-        } catch (IOException e) {
-            System.err.println("Error receiving response: " + e.getMessage());
-            return null;
-        }
-    }
-    
-    private void reassembleFile(String filePath, Map<Integer, byte[]> receivedChunks) {
+    private void reassembleFile(String filePath) {
         String outputPath = "received_" + new File(filePath).getName();
         try (FileOutputStream fos = new FileOutputStream(outputPath)) {
-            for (int i = 0; i < receivedChunks.size(); i++) {
-                fos.write(receivedChunks.get(i));
+            Map<Integer, byte[]> chunks = receivedChunksMap.get(filePath);
+            for (int i = 0; i < chunks.size(); i++) {
+                fos.write(chunks.get(i));
             }
             System.out.println("File reassembled successfully: " + outputPath);
         } catch (IOException e) {
             System.err.println("Error reassembling file: " + e.getMessage());
+        } finally {
+            // Cleanup
+            receivedChunksMap.remove(filePath);
+            totalChunksMap.remove(filePath);
         }
     }
     
