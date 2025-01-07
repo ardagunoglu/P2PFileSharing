@@ -225,7 +225,7 @@ public class PeerConnection {
                 File fullPath = new File(rootPath, selectedFilePath);
 
                 try {
-                    FileManager fileManager = new FileManager(fullPath.getAbsolutePath(), selectedFilePath);
+                    FileManager fileManager = new FileManager(fullPath.getAbsolutePath());
                     System.out.println("File split into " + fileManager.getTotalChunks() + " chunks.");
 
                     fileManager.printChunks();

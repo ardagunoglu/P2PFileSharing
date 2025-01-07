@@ -11,9 +11,8 @@ public class FileManager {
     private static final int CHUNK_SIZE = 256 * 1024;
     private final List<byte[]> fileChunks;
 
-    public FileManager(String rootPath, String filePath) throws IOException {
-        String fullPath = new File(rootPath, filePath).getAbsolutePath();
-        this.fileChunks = splitFileIntoChunks(fullPath);
+    public FileManager(String filePath) throws IOException {
+        this.fileChunks = splitFileIntoChunks(filePath);
     }
 
     private List<byte[]> splitFileIntoChunks(String filePath) throws IOException {
