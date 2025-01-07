@@ -251,8 +251,11 @@ public class PeerConnection {
             if (parts.length == 2) {
                 String filePath = parts[0];
                 int chunkIndex = Integer.parseInt(parts[1]);
+                
+                String rootPath = model.getSharedFolderPath();
+                File fullPath = new File(rootPath, filePath);
 
-                FileManager fileManager = new FileManager(filePath);
+                FileManager fileManager = new FileManager(fullPath.getAbsolutePath());
                 int totalChunks = fileManager.getTotalChunks();
                 byte[] chunkData = fileManager.getChunk(chunkIndex);
 
