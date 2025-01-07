@@ -145,7 +145,6 @@ public class PeerConnection {
         }).start();
     }
     
- // Adjusted methods to use Map<String, Map.Entry<String, Peer>>
     private void handleSearchRequest(String receivedData, InetAddress senderAddress, int senderPort) {
         String query = receivedData.substring(7).trim();
         System.out.println("Search query received: " + query);

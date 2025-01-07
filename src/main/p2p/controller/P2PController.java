@@ -165,8 +165,6 @@ public class P2PController {
                 view.getFoundFilesPanel().updateFoundFilesList(foundFiles);
             }
         });
-
-
     }
 
     private void updateDelFolderButtonState() {
