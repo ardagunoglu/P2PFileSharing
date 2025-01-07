@@ -13,6 +13,7 @@ public class FoundFilesPanel extends AbstractListPanel {
     public FoundFilesPanel() {
         super("Found files");
         filePeerMap = new HashMap<>();
+        initializeSelectionListener();
     }
 
     @Override
@@ -39,7 +40,7 @@ public class FoundFilesPanel extends AbstractListPanel {
 
             String uniqueKey = fileName + "@" + peerIp;
             fileOccurrences.put(uniqueKey, fileOccurrences.getOrDefault(uniqueKey, 0) + 1);
-            filePeerMap.put(fullPath, entry.getValue());
+            filePeerMap.put(fileName + "@" + peerIp, entry.getValue());
         }
 
         for (Map.Entry<String, Map.Entry<String, Peer>> entry : files.entrySet()) {
@@ -70,5 +71,31 @@ public class FoundFilesPanel extends AbstractListPanel {
 
     public Map<String, Map.Entry<String, Peer>> getFilePeerMap() {
         return filePeerMap;
+    }
+
+    private void initializeSelectionListener() {
+        getList().addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                JList<String> list = (JList<String>) e.getSource();
+                String selectedValue = list.getSelectedValue();
+
+                if (selectedValue != null) {
+                    String[] parts = selectedValue.split(" from ");
+                    if (parts.length == 2) {
+                        String fileNameWithCount = parts[0];
+                        String peerIp = parts[1];
+
+                        String fileName = fileNameWithCount.replaceAll(" \\(\\d+\\)$", "");
+                        String uniqueKey = fileName + "@" + peerIp;
+
+                        Map.Entry<String, Peer> fileInfo = filePeerMap.get(uniqueKey);
+                        if (fileInfo != null) {
+                            String hash = fileInfo.getKey();
+                            System.out.println("Selected file hash: " + hash);
+                        }
+                    }
+                }
+            }
+        });
     }
 }
