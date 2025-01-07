@@ -23,7 +23,6 @@ import javax.swing.JList;
 import javax.swing.SwingUtilities;
 
 public class PeerConnection {
-	private static PeerConnection instance; // Singleton instance
     private static final int CONNECTION_PORT = 4000;
     private final P2PModel model;
     private final Set<Peer> foundPeers = new HashSet<>();
@@ -196,22 +195,39 @@ public class PeerConnection {
         Map<String, String> foundFiles = fileSearchManager.searchFilesByHash(hash);
 
         if (!foundFiles.isEmpty()) {
+            String selectedFilePath = null;
+            int selectedDepth = Integer.MAX_VALUE;
+
             for (Map.Entry<String, String> entry : foundFiles.entrySet()) {
                 String filePath = entry.getKey();
                 String fileHash = entry.getValue();
 
+                int depth = calculatePathDepth(filePath);
+
+                if (depth < selectedDepth || (depth == selectedDepth && selectedFilePath == null)) {
+                    selectedFilePath = filePath;
+                    selectedDepth = depth;
+                }
+            }
+
+            if (selectedFilePath != null) {
                 synchronized (nearestFile) {
-                    nearestFile.put(hash, Map.entry(filePath, fileHash));
+                    nearestFile.put(hash, Map.entry(selectedFilePath, foundFiles.get(selectedFilePath)));
                 }
 
-                sendFileMatchResponse(filePath, senderAddress.getHostAddress(), senderAddress, senderPort);
-                System.out.println("File match found and response sent: " + filePath + " | Hash: " + fileHash);
+                sendFileMatchResponse(selectedFilePath, senderAddress.getHostAddress(), senderAddress, senderPort);
+                System.out.println("Selected file match found and response sent: " + selectedFilePath + " | Hash: " + hash);
             }
         } else {
             System.out.println("No matching files found for hash: " + hash);
         }
     }
+    
+    private int calculatePathDepth(String filePath) {
+        String normalizedPath = filePath.replaceAll("^/|/$", "");
 
+        return normalizedPath.split("/").length;
+    }
     
     private void handleMatchFound(String receivedData, InetAddress senderAddress) {
         try {
