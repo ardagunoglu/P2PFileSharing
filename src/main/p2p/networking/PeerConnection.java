@@ -145,6 +145,7 @@ public class PeerConnection {
         }).start();
     }
     
+ // Adjusted methods to use Map<String, Map.Entry<String, Peer>>
     private void handleSearchRequest(String receivedData, InetAddress senderAddress, int senderPort) {
         String query = receivedData.substring(7).trim();
         System.out.println("Search query received: " + query);
@@ -154,28 +155,25 @@ public class PeerConnection {
                 excludeFilesMasksList,
                 excludeFoldersList,
                 rootOnly
-            );
+        );
 
         Map<String, Map.Entry<String, String>> foundFiles = fileSearchManager.searchFiles(query);
 
         StringBuilder response = new StringBuilder();
         for (Map.Entry<String, Map.Entry<String, String>> entry : foundFiles.entrySet()) {
-            String relativePath = entry.getKey();
-            String fileName = entry.getValue().getKey();
-            String hash = entry.getValue().getValue();
-            response.append(relativePath).append("|").append(hash).append(",");
+            response.append(entry.getKey()).append("|").append(entry.getValue().getValue()).append(",");
         }
 
         String responseString = response.length() > 0
-            ? response.substring(0, response.length() - 1)
-            : "NO_FILES_FOUND";
+                ? response.substring(0, response.length() - 1)
+                : "NO_FILES_FOUND";
 
         try {
             DatagramPacket responsePacket = new DatagramPacket(
-                responseString.getBytes(),
-                responseString.length(),
-                senderAddress,
-                senderPort
+                    responseString.getBytes(),
+                    responseString.length(),
+                    senderAddress,
+                    senderPort
             );
             socket.send(responsePacket);
             System.out.println("Search response sent to " + senderAddress + ":" + senderPort);
@@ -183,6 +181,7 @@ public class PeerConnection {
             System.err.println("Error sending search response: " + e.getMessage());
         }
     }
+
 
     private void handleDisconnectMessage(String message, InetAddress senderAddress) {
         Peer disconnectingPeer = new Peer(senderAddress.getHostAddress(), senderAddress.getHostAddress(), CONNECTION_PORT);

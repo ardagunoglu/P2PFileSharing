@@ -154,17 +154,18 @@ public class P2PController {
 
             view.getFoundFilesPanel().clearList();
 
-            Map<String, Map.Entry<String, String>> foundFiles = searchFilesFromPeers(searchQuery);
-            
-            System.out.println(foundFiles.size());
+            Map<String, Map.Entry<String, Peer>> foundFiles = searchFilesFromPeers(searchQuery);
+
+            System.out.println("Found files count: " + foundFiles.size());
 
             if (foundFiles.isEmpty()) {
                 JOptionPane.showMessageDialog(view, "No files found matching the query: " + searchQuery);
             } else {
                 JOptionPane.showMessageDialog(view, "Search completed. Files found and listed.");
-                view.getFoundFilesPanel().updateFoundFilesList(foundFiles); // Update GUI with files and hashes
+                view.getFoundFilesPanel().updateFoundFilesList(foundFiles);
             }
         });
+
 
     }
 
@@ -189,13 +190,13 @@ public class P2PController {
         view.setVisible(true);
     }
     
-    private Map<String, Map.Entry<String, String>> searchFilesFromPeers(String searchQuery) {
-        Map<String, Map.Entry<String, String>> allFoundFiles = new HashMap<>();
+    private Map<String, Map.Entry<String, Peer>> searchFilesFromPeers(String searchQuery) {
+        Map<String, Map.Entry<String, Peer>> allFoundFiles = new HashMap<>();
         FileSearchHandler fileSearchHandler = new FileSearchHandler();
 
         for (Peer peer : model.getPeerGraph().getAllPeers()) {
             if (!peer.getPeerId().equals("local_peer")) {
-                Map<String, Map.Entry<String, String>> peerFiles = fileSearchHandler.searchFilesFromPeer(searchQuery, peer);
+                Map<String, Map.Entry<String, Peer>> peerFiles = fileSearchHandler.searchFilesFromPeer(searchQuery, peer);
 
                 if (!peerFiles.isEmpty()) {
                     allFoundFiles.putAll(peerFiles);
@@ -207,4 +208,5 @@ public class P2PController {
 
         return allFoundFiles;
     }
+
 }

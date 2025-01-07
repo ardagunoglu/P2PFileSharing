@@ -8,11 +8,11 @@ import java.util.Map;
 
 public class FoundFilesPanel extends AbstractListPanel {
 
-    private Map<String, Map.Entry<String, String>> fileHashMap;
+    private Map<String, Map.Entry<String, Peer>> filePeerMap;
 
     public FoundFilesPanel() {
         super("Found files");
-        fileHashMap = new HashMap<>();
+        filePeerMap = new HashMap<>();
     }
 
     @Override
@@ -28,9 +28,9 @@ public class FoundFilesPanel extends AbstractListPanel {
     public void updateFoundFilesList(Map<String, Map.Entry<String, Peer>> files) {
         DefaultListModel<String> model = new DefaultListModel<>();
         Map<String, Integer> fileOccurrences = new HashMap<>();
-        Map<String, Integer> currentDisplayCounts = new HashMap<>();
+        Map<String, Integer> displayCounts = new HashMap<>();
 
-        fileHashMap.clear();
+        filePeerMap.clear();
 
         for (Map.Entry<String, Map.Entry<String, Peer>> entry : files.entrySet()) {
             String fullPath = entry.getKey();
@@ -39,8 +39,7 @@ public class FoundFilesPanel extends AbstractListPanel {
 
             String uniqueKey = fileName + "@" + peerIp;
             fileOccurrences.put(uniqueKey, fileOccurrences.getOrDefault(uniqueKey, 0) + 1);
-
-            fileHashMap.put(fullPath, Map.entry(fileName, peerIp));
+            filePeerMap.put(fullPath, entry.getValue());
         }
 
         for (Map.Entry<String, Map.Entry<String, Peer>> entry : files.entrySet()) {
@@ -50,12 +49,12 @@ public class FoundFilesPanel extends AbstractListPanel {
 
             String uniqueKey = fileName + "@" + peerIp;
 
-            currentDisplayCounts.put(uniqueKey, currentDisplayCounts.getOrDefault(uniqueKey, 0) + 1);
-            int currentCount = currentDisplayCounts.get(uniqueKey);
+            displayCounts.put(uniqueKey, displayCounts.getOrDefault(uniqueKey, 0) + 1);
+            int displayCount = displayCounts.get(uniqueKey);
 
             String displayName = fileOccurrences.get(uniqueKey) > 1
-                ? fileName + " (" + currentCount + ")"
-                : fileName;
+                    ? fileName + " (" + displayCount + ")"
+                    : fileName;
 
             model.addElement(displayName + " from " + peerIp);
         }
@@ -66,10 +65,10 @@ public class FoundFilesPanel extends AbstractListPanel {
     public void clearList() {
         DefaultListModel<String> model = (DefaultListModel<String>) getList().getModel();
         model.clear();
-        fileHashMap.clear();
+        filePeerMap.clear();
     }
 
-    public Map<String, Map.Entry<String, String>> getFileHashMap() {
-        return fileHashMap;
+    public Map<String, Map.Entry<String, Peer>> getFilePeerMap() {
+        return filePeerMap;
     }
 }
