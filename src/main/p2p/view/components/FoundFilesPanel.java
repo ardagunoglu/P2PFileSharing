@@ -74,38 +74,4 @@ public class FoundFilesPanel extends AbstractListPanel {
     public Map<String, Map.Entry<String, Peer>> getFilePeerMap() {
         return filePeerMap;
     }
-
-//    private void initializeMouseListener(PeerConnection peerConnection) {
-//        getList().addMouseListener(new MouseAdapter() {
-//            @Override
-//            public void mouseClicked(MouseEvent e) {
-//                if (e.getClickCount() == 2) {
-//                    JList<String> list = (JList<String>) e.getSource();
-//                    int index = list.locationToIndex(e.getPoint());
-//                    if (index != -1) {
-//                        String selectedValue = list.getModel().getElementAt(index);
-//
-//                        if (selectedValue != null) {
-//                            String[] parts = selectedValue.split(" from ");
-//                            if (parts.length == 2) {
-//                                String fileNameWithCount = parts[0];
-//                                String peerIp = parts[1];
-//
-//                                String fileName = fileNameWithCount.replaceAll(" \\(\\d+\\)$", "");
-//                                String uniqueKey = fileName + "@" + peerIp;
-//
-//                                Map.Entry<String, Peer> fileInfo = filePeerMap.get(uniqueKey);
-//                                if (fileInfo != null) {
-//                                    String hash = fileInfo.getKey();
-//                                    System.out.println("Sending hash query to peers: " + hash);
-//
-//                                    peerConnection.sendHashQuery(hash);
-//                                }
-//                            }
-//                        }
-//                    }
-//                }
-//            }
-//        });
-//    }
 }

@@ -167,6 +167,12 @@ public class P2PController {
                                     System.out.println("Sending hash query to peers: " + hash);
 
                                     peerConnection.sendHashQuery(hash);
+
+                                    String downloadingFileEntry = fileName + " (from: " + peerIp + ")";
+                                    SwingUtilities.invokeLater(() -> {
+                                        view.getDownloadingFilesPanel().addElement(downloadingFileEntry);
+                                        System.out.println("Added file to Downloading Files panel: " + downloadingFileEntry);
+                                    });
                                 }
                             }
                         }
@@ -174,6 +180,7 @@ public class P2PController {
                 }
             }
         });
+
 
         view.getSearchPanel().getSearchButton().addActionListener(e -> {
             if (!model.isConnected()) {
