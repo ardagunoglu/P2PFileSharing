@@ -216,25 +216,29 @@ public class PeerConnection {
                 synchronized (nearestFile) {
                     nearestFile.put(hash, Map.entry(selectedFilePath, foundFiles.get(selectedFilePath)));
                 }
-                
+
+                String rootPath = model.getSharedFolderPath();
+                File fullPath = new File(rootPath, selectedFilePath);
+
                 try {
-                    FileManager fileManager = new FileManager(selectedFilePath);
+                    FileManager fileManager = new FileManager(fullPath.getAbsolutePath());
                     System.out.println("File split into " + fileManager.getTotalChunks() + " chunks.");
-                    
+
                     fileManager.printChunks();
 
                 } catch (IOException e) {
-                    System.err.println("Error splitting file into chunks: " + e.getMessage());
+                    System.err.println("Error splitting file into chunks: " + fullPath.getAbsolutePath() + " (" + e.getMessage() + ")");
                     return;
                 }
 
-                sendFileMatchResponse(selectedFilePath, senderAddress.getHostAddress(), senderAddress, senderPort);
-                System.out.println("Selected file match found and response sent: " + selectedFilePath + " | Hash: " + hash);
+                sendFileMatchResponse(fullPath.getAbsolutePath(), senderAddress.getHostAddress(), senderAddress, senderPort);
+                System.out.println("Selected file match found and response sent: " + fullPath.getAbsolutePath() + " | Hash: " + hash);
             }
         } else {
             System.out.println("No matching files found for hash: " + hash);
         }
     }
+
     
     private int calculatePathDepth(String filePath) {
         String normalizedPath = filePath.replaceAll("^/|/$", "");
