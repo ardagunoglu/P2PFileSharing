@@ -34,7 +34,7 @@ public class PeerConnection {
     private final List<Map.Entry<Peer, String>> matchFoundPeers = new ArrayList<>();
     private final Map<String, Map.Entry<String, String>> nearestFile = new HashMap<>();
     private final BlockingQueue<DatagramPacket> packetQueue = new LinkedBlockingQueue<>();
-    private final List<ScheduledExecutorService> activeSchedulers = new ArrayList<>();
+    private final Map<String, ScheduledExecutorService> activeSchedulers = new HashMap<>();
     private boolean running = true;
     private DatagramSocket socket;
     private P2PController controller;
@@ -273,40 +273,45 @@ public class PeerConnection {
     }
     
     private void startMatchMonitoringForFile(String filePath) {
-        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-        activeSchedulers.add(scheduler);
+        synchronized (activeSchedulers) {
+            if (activeSchedulers.containsKey(filePath)) {
+                System.out.println("Monitoring already active for file: " + filePath);
+                return;
+            }
 
-        scheduler.scheduleAtFixedRate(new Runnable() {
-            private int lastMatchCount = 0;
+            ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+            activeSchedulers.put(filePath, scheduler);
 
-            @Override
-            public void run() {
-                synchronized (matchFoundPeers) {
-                    int currentMatchCount = (int) matchFoundPeers.stream()
-                            .filter(entry -> entry.getValue().equals(filePath))
-                            .count();
+            scheduler.scheduleAtFixedRate(new Runnable() {
+                private int lastMatchCount = 0;
 
-                    if (currentMatchCount > 0 && currentMatchCount == lastMatchCount) {
-                        System.out.println("All peers have sent match data for file: " + filePath);
-                        processMatchFoundPeersForFile(filePath);
-                        scheduler.shutdown(); // Bu dosya için takip tamamlandı
-                        activeSchedulers.remove(scheduler);
-                    } else {
-                        lastMatchCount = currentMatchCount;
+                @Override
+                public void run() {
+                    synchronized (matchFoundPeers) {
+                        int currentMatchCount = (int) matchFoundPeers.stream()
+                                .filter(entry -> entry.getValue().equals(filePath))
+                                .count();
+
+                        if (currentMatchCount > 0 && currentMatchCount == lastMatchCount) {
+                            System.out.println("All peers have sent match data for file: " + filePath);
+                            processMatchFoundPeersForFile(filePath);
+                            stopMonitoringForFile(filePath);
+                        } else {
+                            lastMatchCount = currentMatchCount;
+                        }
                     }
                 }
-            }
-        }, 0, 2, TimeUnit.SECONDS);
+            }, 0, 2, TimeUnit.SECONDS);
+        }
     }
     
-    public void shutdownAllSchedulers() {
+    private void stopMonitoringForFile(String filePath) {
         synchronized (activeSchedulers) {
-            for (ScheduledExecutorService scheduler : activeSchedulers) {
-                if (!scheduler.isShutdown()) {
-                    scheduler.shutdown();
-                }
+            ScheduledExecutorService scheduler = activeSchedulers.remove(filePath);
+            if (scheduler != null && !scheduler.isShutdown()) {
+                scheduler.shutdown();
+                System.out.println("Monitoring stopped for file: " + filePath);
             }
-            activeSchedulers.clear();
         }
     }
     
