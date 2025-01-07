@@ -204,39 +204,19 @@ public class PeerConnection {
                 String filePath = parts[0];
                 int chunkIndex = Integer.parseInt(parts[1]);
                 int totalChunks = Integer.parseInt(parts[2]);
-                String base64Chunk = parts[3].trim();
+                String rawChunk = parts[3];
 
-                if (base64Chunk.length() % 4 != 0) {
-                    int paddingLength = 4 - (base64Chunk.length() % 4);
-                    base64Chunk += "=".repeat(paddingLength);
-                }
-
-                byte[] chunkData = Base64.getDecoder().decode(base64Chunk);
-
-                System.out.println("Decoded raw byte data (hex):");
-                for (byte b : chunkData) {
+                byte[] rawBytes = rawChunk.getBytes();
+                System.out.println("Raw byte values for chunk:");
+                for (byte b : rawBytes) {
                     System.out.printf("%02X ", b);
                 }
                 System.out.println();
 
-                synchronized (receivedChunksMap) {
-                    receivedChunksMap.putIfAbsent(filePath, new HashMap<>());
-                    receivedChunksMap.get(filePath).put(chunkIndex, chunkData);
-                    totalChunksMap.put(filePath, totalChunks);
-                }
-
-                System.out.println("Received and decoded chunk " + chunkIndex + " for file " + filePath);
-
-                if (receivedChunksMap.get(filePath).size() == totalChunks) {
-                    System.out.println("All chunks received for file: " + filePath);
-                }
+                System.out.println("Received raw chunk " + chunkIndex + " for file " + filePath);
             } else {
                 System.err.println("Invalid RESPONSE_CHUNK format. Received parts: " + parts.length);
             }
-        } catch (IllegalArgumentException e) {
-            System.err.println("Base64 decoding error for chunk data: " + e.getMessage());
-            System.err.println("Base64 chunk: " + responseData);
-            e.printStackTrace();
         } catch (Exception e) {
             System.err.println("Error handling RESPONSE_CHUNK: " + e.getMessage());
             e.printStackTrace();
