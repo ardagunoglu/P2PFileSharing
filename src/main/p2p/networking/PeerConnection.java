@@ -203,7 +203,13 @@ public class PeerConnection {
                 String filePath = parts[0];
                 int chunkIndex = Integer.parseInt(parts[1]);
                 int totalChunks = Integer.parseInt(parts[2]);
-                byte[] chunkData = Base64.getDecoder().decode(parts[3]);
+                String base64Chunk = parts[3];
+
+                while (base64Chunk.length() % 4 != 0) {
+                    base64Chunk += "=";
+                }
+
+                byte[] chunkData = Base64.getDecoder().decode(base64Chunk);
 
                 synchronized (receivedChunksMap) {
                     receivedChunksMap.putIfAbsent(filePath, new HashMap<>());
@@ -211,9 +217,8 @@ public class PeerConnection {
                     totalChunksMap.put(filePath, totalChunks);
                 }
 
-                System.out.println("Received chunk " + chunkIndex + " for file " + filePath);
+                System.out.println("Received and decoded chunk " + chunkIndex + " for file " + filePath);
 
-                // Check if all chunks are received
                 if (receivedChunksMap.get(filePath).size() == totalChunks) {
                     System.out.println("All chunks received for file: " + filePath);
                     reassembleFile(filePath);
@@ -221,10 +226,15 @@ public class PeerConnection {
             } else {
                 System.err.println("Invalid RESPONSE_CHUNK format.");
             }
+        } catch (IllegalArgumentException e) {
+            System.err.println("Base64 decoding error for chunk data.");
+            e.printStackTrace();
         } catch (Exception e) {
             System.err.println("Error handling RESPONSE_CHUNK: " + e.getMessage());
+            e.printStackTrace();
         }
     }
+
     
     private void handleHashQuery(String hash, InetAddress senderAddress, int senderPort) {
         System.out.println("Hash query received: " + hash);
