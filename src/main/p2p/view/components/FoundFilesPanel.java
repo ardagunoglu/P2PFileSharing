@@ -3,6 +3,8 @@ package main.p2p.view.components;
 import main.p2p.model.Peer;
 
 import javax.swing.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -13,7 +15,7 @@ public class FoundFilesPanel extends AbstractListPanel {
     public FoundFilesPanel() {
         super("Found files");
         filePeerMap = new HashMap<>();
-        initializeSelectionListener();
+        initializeMouseListener();
     }
 
     @Override
@@ -73,25 +75,31 @@ public class FoundFilesPanel extends AbstractListPanel {
         return filePeerMap;
     }
 
-    private void initializeSelectionListener() {
-        getList().addListSelectionListener(e -> {
-            if (!e.getValueIsAdjusting()) {
-                JList<String> list = (JList<String>) e.getSource();
-                String selectedValue = list.getSelectedValue();
+    private void initializeMouseListener() {
+        getList().addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) {
+                    JList<String> list = (JList<String>) e.getSource();
+                    int index = list.locationToIndex(e.getPoint());
+                    if (index != -1) {
+                        String selectedValue = list.getModel().getElementAt(index);
 
-                if (selectedValue != null) {
-                    String[] parts = selectedValue.split(" from ");
-                    if (parts.length == 2) {
-                        String fileNameWithCount = parts[0];
-                        String peerIp = parts[1];
+                        if (selectedValue != null) {
+                            String[] parts = selectedValue.split(" from ");
+                            if (parts.length == 2) {
+                                String fileNameWithCount = parts[0];
+                                String peerIp = parts[1];
 
-                        String fileName = fileNameWithCount.replaceAll(" \\(\\d+\\)$", "");
-                        String uniqueKey = fileName + "@" + peerIp;
+                                String fileName = fileNameWithCount.replaceAll(" \\(\\d+\\)$", "");
+                                String uniqueKey = fileName + "@" + peerIp;
 
-                        Map.Entry<String, Peer> fileInfo = filePeerMap.get(uniqueKey);
-                        if (fileInfo != null) {
-                            String hash = fileInfo.getKey();
-                            System.out.println("Selected file hash: " + hash);
+                                Map.Entry<String, Peer> fileInfo = filePeerMap.get(uniqueKey);
+                                if (fileInfo != null) {
+                                    String hash = fileInfo.getKey();
+                                    System.out.println("Selected file hash (on double-click): " + hash);
+                                }
+                            }
                         }
                     }
                 }
