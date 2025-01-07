@@ -197,7 +197,6 @@ public class PeerConnection {
     }
     
     private void handleChunkResponse(String responseData) {
-        try {
             String[] parts = responseData.split("\\|", 4);
             if (parts.length == 4) {
                 String filePath = parts[0];
@@ -226,13 +225,7 @@ public class PeerConnection {
             } else {
                 System.err.println("Invalid RESPONSE_CHUNK format.");
             }
-        } catch (IllegalArgumentException e) {
-            System.err.println("Base64 decoding error for chunk data.");
-            e.printStackTrace();
-        } catch (Exception e) {
-            System.err.println("Error handling RESPONSE_CHUNK: " + e.getMessage());
-            e.printStackTrace();
-        }
+       
     }
 
     
