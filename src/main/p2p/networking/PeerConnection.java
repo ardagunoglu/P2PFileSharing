@@ -420,10 +420,7 @@ public class PeerConnection {
                             break;
                         }
 
-                        if (chunks.containsKey(chunkIndex)) {
-                            chunkIndex++;
-                            continue;
-                        }
+                        chunkIndex++;
                     }
 
                     String requestMessage = "REQUEST_CHUNK:" + filePath + "|" + chunkIndex;
