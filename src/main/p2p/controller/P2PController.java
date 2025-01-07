@@ -232,6 +232,10 @@ public class P2PController {
         view.setVisible(true);
     }
     
+    public P2PView getView() {
+        return view;
+    }
+    
     private Map<String, Map.Entry<String, Peer>> searchFilesFromPeers(String searchQuery) {
         Map<String, Map.Entry<String, Peer>> allFoundFiles = new HashMap<>();
         FileSearchHandler fileSearchHandler = new FileSearchHandler();

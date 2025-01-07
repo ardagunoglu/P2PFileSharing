@@ -31,6 +31,8 @@ public class PeerConnection {
     private final List<Map.Entry<Peer, String>> matchFoundPeers = new ArrayList<>();
     private final Map<String, Map.Entry<String, String>> nearestFile = new HashMap<>();
     private final BlockingQueue<DatagramPacket> packetQueue = new LinkedBlockingQueue<>();
+    private final Map<String, byte[]> downloadedFiles = new HashMap<>();
+    private final Map<String, Integer> chunkCountMap = new HashMap<>();
     private boolean running = true;
     private DatagramSocket socket;
     private P2PController controller;
@@ -175,6 +177,10 @@ public class PeerConnection {
             handleHashQuery(receivedData.substring(11), senderAddress, packet.getPort());
         } else if (receivedData.startsWith("MATCH_FOUND:")) {
             handleMatchFound(receivedData, senderAddress);
+        } else if (receivedData.startsWith("REQUEST_CHUNK:")) {
+            handleChunkRequest(receivedData.substring(14), senderAddress, packet.getPort());
+        } else if (receivedData.startsWith("RESPONSE_CHUNK:")) {
+            handleChunkResponse(receivedData.substring(15));
         } else {
             try {
 				handlePeerConnectionMessages(receivedData, packet, senderAddress);
@@ -184,6 +190,123 @@ public class PeerConnection {
         }
     }
     
+    private void handleChunkRequest(String data, InetAddress requesterAddress, int requesterPort) {
+        try {
+            String[] parts = data.split("\\|");
+            if (parts.length != 2) return;
+
+            String filePath = parts[0].trim();
+            int chunkIndex = Integer.parseInt(parts[1].trim());
+
+            FileManager fileManager = new FileManager(filePath);
+            byte[] chunkData = fileManager.getChunk(chunkIndex);
+
+            if (chunkData != null) {
+                String response = "RESPONSE_CHUNK:" + filePath + "|" + chunkIndex + "|" + new String(chunkData);
+                DatagramPacket responsePacket = new DatagramPacket(
+                    response.getBytes(),
+                    response.length(),
+                    requesterAddress,
+                    requesterPort
+                );
+                socket.send(responsePacket);
+                System.out.println("Sent chunk " + chunkIndex + " of file " + filePath + " to " + requesterAddress);
+            } else {
+                System.err.println("Chunk " + chunkIndex + " not found for file " + filePath);
+            }
+        } catch (Exception e) {
+            System.err.println("Error handling chunk request: " + e.getMessage());
+        }
+    }
+    
+    public void downloadFileFromPeers(String filePath, FileManager fileManager) {
+        int totalChunks = fileManager.getTotalChunks();
+        chunkCountMap.put(filePath, totalChunks);
+        System.out.println("Total chunks to download: " + totalChunks);
+
+        List<Peer> peersForFile = new ArrayList<>();
+        synchronized (matchFoundPeers) {
+            for (Map.Entry<Peer, String> entry : matchFoundPeers) {
+                if (entry.getValue().equals(filePath)) {
+                    peersForFile.add(entry.getKey());
+                }
+            }
+        }
+
+        if (peersForFile.isEmpty()) {
+            System.out.println("No peers found for the file: " + filePath);
+            return;
+        }
+
+        int currentChunkIndex = 0;
+        while (currentChunkIndex < totalChunks) {
+            Peer selectedPeer = peersForFile.get(currentChunkIndex % peersForFile.size());
+            String request = "REQUEST_CHUNK:" + filePath + "|" + currentChunkIndex;
+
+            try {
+                DatagramPacket requestPacket = new DatagramPacket(
+                    request.getBytes(),
+                    request.length(),
+                    InetAddress.getByName(selectedPeer.getIpAddress()),
+                    selectedPeer.getPort()
+                );
+                socket.send(requestPacket);
+                System.out.println("Requested chunk " + currentChunkIndex + " from peer: " + selectedPeer.getIpAddress());
+            } catch (Exception e) {
+                System.err.println("Error requesting chunk: " + e.getMessage());
+            }
+
+            currentChunkIndex++;
+        }
+    }
+
+    
+    private void handleChunkResponse(String data) {
+        try {
+            String[] parts = data.split("\\|");
+            if (parts.length != 3) return;
+
+            String filePath = parts[0].trim();
+            int chunkIndex = Integer.parseInt(parts[1].trim());
+            byte[] chunkData = parts[2].getBytes();
+
+            downloadedFiles.putIfAbsent(filePath, new byte[chunkCountMap.getOrDefault(filePath, 0) * 256]);
+            System.arraycopy(chunkData, 0, downloadedFiles.get(filePath), chunkIndex * 256, chunkData.length);
+
+            System.out.println("Received chunk " + chunkIndex + " for file " + filePath);
+
+            if (isDownloadComplete(filePath)) {
+                System.out.println("Download complete for file: " + filePath);
+                saveFile(filePath);
+            }
+        } catch (Exception e) {
+            System.err.println("Error handling chunk response: " + e.getMessage());
+        }
+    }
+
+    private boolean isDownloadComplete(String filePath) {
+        return downloadedFiles.get(filePath) != null &&
+               downloadedFiles.get(filePath).length == chunkCountMap.getOrDefault(filePath, 0) * 256;
+    }
+
+    private void saveFile(String filePath) {
+        try {
+        	String destinationFolder = controller.getView().getDestinationPanel().getFolderField().getText();
+            if (destinationFolder == null || destinationFolder.isEmpty()) {
+                System.err.println("Destination folder is not set!");
+                return;
+            }
+
+            File outputFile = new File(destinationFolder, new File(filePath).getName());
+            outputFile.getParentFile().mkdirs();
+
+            java.nio.file.Files.write(outputFile.toPath(), downloadedFiles.get(filePath));
+            System.out.println("File saved to: " + outputFile.getAbsolutePath());
+        } catch (IOException e) {
+            System.err.println("Error saving file: " + e.getMessage());
+        }
+    }
+
     private void handleHashQuery(String hash, InetAddress senderAddress, int senderPort) {
         System.out.println("Hash query received: " + hash);
 
@@ -260,11 +383,25 @@ public class PeerConnection {
                 }
 
                 System.out.println("MATCH_FOUND: File " + filePath + " available from peer " + matchingPeer.getIpAddress());
+
+                new Thread(() -> {
+                    try {
+                        Thread.sleep(2000);
+                        synchronized (matchFoundPeers) {
+                            if (!matchFoundPeers.isEmpty()) {
+                                downloadFileFromPeers(filePath, new FileManager(filePath));
+                            }
+                        }
+                    } catch (Exception e) {
+                        System.err.println("Error starting download: " + e.getMessage());
+                    }
+                }).start();
             }
         } catch (Exception e) {
             System.err.println("Error handling MATCH_FOUND: " + e.getMessage());
         }
     }
+
     
     public List<Map.Entry<Peer, String>> getMatchFoundPeers() {
         synchronized (matchFoundPeers) {
