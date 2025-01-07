@@ -33,6 +33,56 @@ public class FileSearchManager {
         }
         return result;
     }
+    
+    public Map<String, String> searchFilesByHash(String hash) {
+        Map<String, String> result = new HashMap<>();
+        if (rootDirectory != null && rootDirectory.isDirectory()) {
+            if (rootOnly) {
+                searchHashInRootOnly(rootDirectory, hash, result);
+            } else {
+                searchHashInDirectory(rootDirectory, hash, result, "");
+            }
+        }
+        return result;
+    }
+    
+    private void searchHashInDirectory(File directory, String hash, Map<String, String> result, String relativePath) {
+        if (shouldExcludeDirectory(directory)) {
+            System.out.println("Skipping excluded directory: " + directory.getName());
+            return;
+        }
+
+        File[] files = directory.listFiles();
+        if (files != null) {
+            for (File file : files) {
+                String newRelativePath = relativePath + "/" + file.getName();
+                if (file.isDirectory()) {
+                    searchHashInDirectory(file, hash, result, newRelativePath);
+                } else if (shouldIncludeFileByHash(file)) {
+                    String fileHash = computeFileHash(file);
+                    if (fileHash.equals(hash)) {
+                        result.put(newRelativePath, fileHash);
+                        System.out.println("Hash matched: " + newRelativePath + " | Hash: " + fileHash);
+                    }
+                }
+            }
+        }
+    }
+
+    private void searchHashInRootOnly(File directory, String hash, Map<String, String> result) {
+        File[] files = directory.listFiles();
+        if (files != null) {
+            for (File file : files) {
+                if (!file.isDirectory() && shouldIncludeFileByHash(file)) {
+                    String fileHash = computeFileHash(file);
+                    if (fileHash.equals(hash)) {
+                        result.put("/" + file.getName(), fileHash);
+                        System.out.println("Hash matched in root only: " + file.getName() + " | Hash: " + fileHash);
+                    }
+                }
+            }
+        }
+    }
 
     private void searchInDirectory(File directory, String query, Map<String, Map.Entry<String, String>> result, String relativePath) {
         if (shouldExcludeDirectory(directory)) {
@@ -118,5 +168,24 @@ public class FileSearchManager {
         }
 
         return fileName.contains(query.toLowerCase());
+    }
+    
+    private boolean shouldIncludeFileByHash(File file) {
+        String fileName = file.getName().toLowerCase();
+        ListModel<String> exclusionListModel = excludeFilesMasksList.getModel();
+
+        for (int i = 0; i < exclusionListModel.getSize(); i++) {
+            String exclusionPattern = exclusionListModel.getElementAt(i).toLowerCase();
+
+            if (fileName.equals(exclusionPattern)) {
+                return false;
+            }
+
+            if (exclusionPattern.startsWith("*.") && fileName.endsWith(exclusionPattern.substring(1))) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

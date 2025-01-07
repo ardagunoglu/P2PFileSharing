@@ -8,20 +8,28 @@ import main.p2p.util.NetworkUtils;
 
 import java.io.File;
 import java.net.*;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import javax.swing.JList;
 import javax.swing.SwingUtilities;
 
 public class PeerConnection {
+	private static PeerConnection instance; // Singleton instance
     private static final int CONNECTION_PORT = 4000;
     private final P2PModel model;
     private final Set<Peer> foundPeers = new HashSet<>();
+    private final List<Map.Entry<Peer, String>> matchFoundPeers = new ArrayList<>();
+    private final Map<String, Map.Entry<String, String>> nearestFile = new HashMap<>();
+    private final BlockingQueue<DatagramPacket> packetQueue = new LinkedBlockingQueue<>();
     private boolean running = true;
     private DatagramSocket socket;
     private P2PController controller;
@@ -117,9 +125,11 @@ public class PeerConnection {
                 System.out.println("Local address detected: " + localAddress);
 
                 while (running) {
-                    byte[] buffer = new byte[1024];
+                    byte[] buffer = new byte[4096];
                     DatagramPacket receivedPacket = new DatagramPacket(buffer, buffer.length);
                     socket.receive(receivedPacket);
+                    
+                    if (!running) break;
 
                     String receivedData = new String(receivedPacket.getData(), 0, receivedPacket.getLength());
                     InetAddress senderAddress = receivedPacket.getAddress();
@@ -130,12 +140,8 @@ public class PeerConnection {
                     }
 
                     System.out.println("Received data: " + receivedData + " from " + senderAddress);
-
-                    if (receivedData.startsWith("SEARCH:")) {
-                        handleSearchRequest(receivedData, senderAddress, receivedPacket.getPort());
-                    } else {
-                        handlePeerConnectionMessages(receivedData, receivedPacket, senderAddress);
-                    }
+                    
+                    packetQueue.put(receivedPacket);
                 }
             } catch (Exception e) {
                 if (running) {
@@ -143,6 +149,140 @@ public class PeerConnection {
                 }
             }
         }).start();
+        
+        new Thread(() -> {
+            while (running) {
+                try {
+                    DatagramPacket packet = packetQueue.take();
+                    processResponse(packet);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    System.err.println("Processing thread interrupted: " + e.getMessage());
+                }
+            }
+        }).start();
+    }
+    
+    private void processResponse(DatagramPacket packet) {
+    	
+    	String receivedData = new String(packet.getData(), 0, packet.getLength());
+        InetAddress senderAddress = packet.getAddress();
+    	
+    	if (receivedData.startsWith("SEARCH:")) {
+            handleSearchRequest(receivedData, senderAddress, packet.getPort());
+        } else if (receivedData.startsWith("QUERY_HASH:")) {
+            handleHashQuery(receivedData.substring(11), senderAddress, packet.getPort());
+        } else if (receivedData.startsWith("MATCH_FOUND:")) {
+            handleMatchFound(receivedData, senderAddress);
+        } else {
+            try {
+				handlePeerConnectionMessages(receivedData, packet, senderAddress);
+			} catch (SocketException e) {
+				e.printStackTrace();
+			}
+        }
+    }
+    
+    private void handleHashQuery(String hash, InetAddress senderAddress, int senderPort) {
+        System.out.println("Hash query received: " + hash);
+
+        FileSearchManager fileSearchManager = new FileSearchManager(
+            new File(model.getSharedFolderPath()),
+            excludeFilesMasksList,
+            excludeFoldersList,
+            rootOnly
+        );
+
+        Map<String, String> foundFiles = fileSearchManager.searchFilesByHash(hash);
+
+        if (!foundFiles.isEmpty()) {
+            for (Map.Entry<String, String> entry : foundFiles.entrySet()) {
+                String filePath = entry.getKey();
+                String fileHash = entry.getValue();
+
+                synchronized (nearestFile) {
+                    nearestFile.put(hash, Map.entry(filePath, fileHash));
+                }
+
+                sendFileMatchResponse(filePath, senderAddress.getHostAddress(), senderAddress, senderPort);
+                System.out.println("File match found and response sent: " + filePath + " | Hash: " + fileHash);
+            }
+        } else {
+            System.out.println("No matching files found for hash: " + hash);
+        }
+    }
+
+    
+    private void handleMatchFound(String receivedData, InetAddress senderAddress) {
+        try {
+            String[] parts = receivedData.substring(12).split("\\|");
+            if (parts.length == 2) {
+                String filePath = parts[0];
+                String requesterIp = parts[1];
+
+                Peer matchingPeer = new Peer(senderAddress.getHostAddress(), senderAddress.getHostAddress(), CONNECTION_PORT);
+
+                synchronized (matchFoundPeers) {
+                    matchFoundPeers.add(Map.entry(matchingPeer, filePath));
+                }
+
+                System.out.println("MATCH_FOUND: File " + filePath + " available from peer " + matchingPeer.getIpAddress());
+            }
+        } catch (Exception e) {
+            System.err.println("Error handling MATCH_FOUND: " + e.getMessage());
+        }
+    }
+    
+    public List<Map.Entry<Peer, String>> getMatchFoundPeers() {
+        synchronized (matchFoundPeers) {
+            return new ArrayList<>(matchFoundPeers);
+        }
+    }
+
+    private void sendFileMatchResponse(String filePath, String requesterIp, InetAddress senderAddress, int senderPort) {
+        try {
+            String response = "MATCH_FOUND:" + filePath + "|" + requesterIp;
+            DatagramPacket responsePacket = new DatagramPacket(
+                response.getBytes(),
+                response.length(),
+                senderAddress,
+                senderPort
+            );
+
+            socket.send(responsePacket);
+            System.out.println("MATCH_FOUND response sent for file: " + filePath + " to requester IP: " + requesterIp);
+        } catch (Exception e) {
+            System.err.println("Error sending MATCH_FOUND response: " + e.getMessage());
+        }
+    }
+
+    
+    public Map<String, Map.Entry<String, String>> getNearestFile() {
+        synchronized (nearestFile) {
+            return new HashMap<>(nearestFile);
+        }
+    }
+    
+    public void sendHashQuery(String hash) {
+        for (Peer peer : model.getPeers()) {
+            if (!peer.getPeerId().equals("local_peer")) {
+                new Thread(() -> {
+                    try {
+                        String queryMessage = "QUERY_HASH:" + hash;
+                        DatagramPacket packet = new DatagramPacket(
+                            queryMessage.getBytes(),
+                            queryMessage.length(),
+                            InetAddress.getByName(peer.getIpAddress()),
+                            peer.getPort()
+                        );
+                        socket.send(packet);
+                        System.out.println("Sent hash query to: " + peer.getIpAddress());
+                    } catch (Exception e) {
+                        System.err.println("Error sending hash query: " + e.getMessage());
+                    }
+                }).start();
+            }
+        }
     }
     
     private void handleSearchRequest(String receivedData, InetAddress senderAddress, int senderPort) {
