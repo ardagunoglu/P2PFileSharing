@@ -182,7 +182,7 @@ public class PeerConnection {
         } else if (receivedData.startsWith("REQUEST_CHUNK:")) {
             handleChunkRequest(receivedData, senderAddress, packet.getPort());
         } else if (receivedData.startsWith("WAIT_PEERS_F:")) {
-            handleChunkRequest(receivedData, senderAddress, packet.getPort());
+            handleWaitPeersF(receivedData);
         } else {
             try {
 				handlePeerConnectionMessages(receivedData, packet, senderAddress);
@@ -244,6 +244,27 @@ public class PeerConnection {
             }
         } else {
             System.out.println("No matching files found for hash: " + hash);
+        }
+    }
+
+    private void sendWaitPeersF(String filePath) {
+        synchronized (matchFoundPeers) {
+            for (Map.Entry<Peer, String> peerEntry : matchFoundPeers) {
+                Peer peer = peerEntry.getKey();
+                try {
+                    String waitMessage = "WAIT_PEERS_F:" + filePath;
+                    DatagramPacket packet = new DatagramPacket(
+                        waitMessage.getBytes(),
+                        waitMessage.length(),
+                        InetAddress.getByName(peer.getIpAddress()),
+                        peer.getPort()
+                    );
+                    socket.send(packet);
+                    System.out.println("Sent WAIT_PEERS_F for file: " + filePath + " to " + peer.getIpAddress());
+                } catch (Exception e) {
+                    System.err.println("Error sending WAIT_PEERS_F: " + e.getMessage());
+                }
+            }
         }
     }
 
@@ -331,7 +352,7 @@ public class PeerConnection {
 
                         if (currentMatchCount > 0 && currentMatchCount == lastMatchCount) {
                             System.out.println("All peers have sent match data for file: " + filePath);
-                            //send WAIT_PEERS_F query to all matchFoundPeers peers
+                            sendWaitPeersF(filePath);
                             stopMonitoringForFile(filePath);
                         } else {
                             lastMatchCount = currentMatchCount;
@@ -351,6 +372,17 @@ public class PeerConnection {
             }
         }
     }
+    
+    private void handleWaitPeersF(String receivedData) {
+        try {
+            String filePath = receivedData.substring(13).trim(); // Extract file path
+            System.out.println("Received WAIT_PEERS_F for file: " + filePath);
+            processMatchFoundPeersForFile(filePath);
+        } catch (Exception e) {
+            System.err.println("Error handling WAIT_PEERS_F: " + e.getMessage());
+        }
+    }
+
     
     private void processMatchFoundPeersForFile(String filePath) {
         synchronized (matchFoundPeers) {
