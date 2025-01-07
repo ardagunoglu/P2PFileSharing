@@ -356,7 +356,7 @@ public class PeerConnection {
             int totalChunks = 0;
 
             try {
-                FileManager fileManager = new FileManager(model.getSharedFolderPath(), filePath);
+                FileManager fileManager = new FileManager("C:\\Users\\ardag\\Desktop\\test", filePath);
                 totalChunks = fileManager.getTotalChunks();
                 System.out.println("Total chunks to download: " + totalChunks);
             } catch (IOException e) {
