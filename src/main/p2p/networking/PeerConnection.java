@@ -181,6 +181,8 @@ public class PeerConnection {
             handleMatchFound(receivedData, senderAddress);
         } else if (receivedData.startsWith("REQUEST_CHUNK:")) {
             handleChunkRequest(receivedData, senderAddress, packet.getPort());
+        } else if (receivedData.startsWith("WAIT_PEERS_F:")) {
+        	handleWaitPeersF(receivedData);
         } else {
             try {
 				handlePeerConnectionMessages(receivedData, packet, senderAddress);
@@ -267,10 +269,44 @@ public class PeerConnection {
 
                 System.out.println("MATCH_FOUND: File " + filePath + " available from peer " + matchingPeer.getIpAddress());
 
-                startMatchMonitoringForFile(filePath);
+                ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+                scheduler.schedule(() -> {
+                    sendWaitPeersF(filePath);
+                }, 2, TimeUnit.SECONDS);
             }
         } catch (Exception e) {
             System.err.println("Error handling MATCH_FOUND: " + e.getMessage());
+        }
+    }
+
+    private void sendWaitPeersF(String filePath) {
+        synchronized (matchFoundPeers) {
+            for (Map.Entry<Peer, String> peerEntry : matchFoundPeers) {
+                Peer peer = peerEntry.getKey();
+                try {
+                    String waitMessage = "WAIT_PEERS_F:" + filePath;
+                    DatagramPacket packet = new DatagramPacket(
+                        waitMessage.getBytes(),
+                        waitMessage.length(),
+                        InetAddress.getByName(peer.getIpAddress()),
+                        peer.getPort()
+                    );
+                    socket.send(packet);
+                    System.out.println("Sent WAIT_PEERS_F for file: " + filePath + " to " + peer.getIpAddress());
+                } catch (Exception e) {
+                    System.err.println("Error sending WAIT_PEERS_F: " + e.getMessage());
+                }
+            }
+        }
+    }
+
+    private void handleWaitPeersF(String receivedData) {
+        try {
+            String filePath = receivedData.substring(13).trim();
+            System.out.println("Received WAIT_PEERS_F for file: " + filePath);
+            processMatchFoundPeersForFile(filePath);
+        } catch (Exception e) {
+            System.err.println("Error handling WAIT_PEERS_F: " + e.getMessage());
         }
     }
     
@@ -329,7 +365,7 @@ public class PeerConnection {
 
                         if (currentMatchCount > 0 && currentMatchCount == lastMatchCount) {
                             System.out.println("All peers have sent match data for file: " + filePath);
-                            processMatchFoundPeersForFile(filePath);
+                            //send WAIT_PEERS_F query to all matchFoundPeers peers
                             stopMonitoringForFile(filePath);
                         } else {
                             lastMatchCount = currentMatchCount;
@@ -356,7 +392,7 @@ public class PeerConnection {
             int totalChunks = 0;
 
             try {
-                FileManager fileManager = new FileManager("C:\\Users\\ardag\\Desktop\\test", filePath);
+                FileManager fileManager = new FileManager(model.getSharedFolderPath(), filePath);
                 totalChunks = fileManager.getTotalChunks();
                 System.out.println("Total chunks to download: " + totalChunks);
             } catch (IOException e) {
