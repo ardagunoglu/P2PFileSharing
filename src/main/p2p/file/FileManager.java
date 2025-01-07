@@ -10,14 +10,30 @@ public class FileManager {
 
     private static final int CHUNK_SIZE = 256 * 1024;
     private final List<byte[]> fileChunks;
+    private static String rootDirectory = "";
 
     public FileManager(String filePath) throws IOException {
-        this.fileChunks = splitFileIntoChunks(filePath);
+        String resolvedFilePath = resolveFilePath(filePath);
+        this.fileChunks = splitFileIntoChunks(resolvedFilePath);
+    }
+
+    private String resolveFilePath(String filePath) {
+        if (rootDirectory != null && !rootDirectory.isEmpty()) {
+            File file = new File(filePath);
+            if (!file.isAbsolute()) {
+                return new File(rootDirectory, filePath).getAbsolutePath();
+            }
+        }
+        return filePath;
     }
 
     private List<byte[]> splitFileIntoChunks(String filePath) throws IOException {
         List<byte[]> chunks = new ArrayList<>();
         File file = new File(filePath);
+
+        if (!file.exists()) {
+            throw new IOException("File not found: " + filePath);
+        }
 
         try (FileInputStream fis = new FileInputStream(file)) {
             byte[] buffer = new byte[CHUNK_SIZE];
@@ -51,5 +67,13 @@ public class FileManager {
         for (int i = 0; i < fileChunks.size(); i++) {
             System.out.println("Index " + (i + 1) + ": Chunk Size = " + fileChunks.get(i).length + " bytes");
         }
+    }
+
+    public static void setRootDirectory(String rootDir) {
+        rootDirectory = rootDir;
+    }
+
+    public static String getRootDirectory() {
+        return rootDirectory;
     }
 }
