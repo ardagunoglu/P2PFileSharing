@@ -404,12 +404,28 @@ public class PeerConnection {
     private void requestChunksFromPeer(Peer peer, String filePath) {
         new Thread(() -> {
             int chunkIndex = 0;
+
             synchronized (totalChunksMap) {
-                totalChunksMap.put(filePath, Integer.MAX_VALUE);
+                totalChunksMap.putIfAbsent(filePath, Integer.MAX_VALUE);
             }
 
             while (true) {
                 try {
+                    synchronized (receivedChunksMap) {
+                        Map<Integer, byte[]> chunks = receivedChunksMap.getOrDefault(filePath, new HashMap<>());
+                        Integer totalChunks = totalChunksMap.get(filePath);
+
+                        if (chunks.size() == totalChunks) {
+                            System.out.println("All chunks received for file: " + filePath);
+                            break;
+                        }
+
+                        if (chunks.containsKey(chunkIndex)) {
+                            chunkIndex++;
+                            continue;
+                        }
+                    }
+
                     String requestMessage = "REQUEST_CHUNK:" + filePath + "|" + chunkIndex;
                     DatagramPacket requestPacket = new DatagramPacket(
                             requestMessage.getBytes(),
@@ -421,23 +437,7 @@ public class PeerConnection {
                     socket.send(requestPacket);
                     System.out.println("Sent REQUEST_CHUNK to peer: " + peer.getIpAddress() + " for chunk index: " + chunkIndex);
 
-                    Thread.sleep(1000);
-
-                    synchronized (receivedChunksMap) {
-                        Map<Integer, byte[]> chunks = receivedChunksMap.get(filePath);
-                        Integer totalChunks = totalChunksMap.get(filePath);
-
-                        if (chunks != null && totalChunks != null) {
-                            if (chunks.size() == totalChunks) {
-                                System.out.println("All chunks received for file: " + filePath);
-                                reassembleFile(filePath);
-                                break;
-                            }
-                            if (chunks.containsKey(chunkIndex)) {
-                                chunkIndex++;
-                            }
-                        }
-                    }
+                    Thread.sleep(500);
                 } catch (Exception e) {
                     System.err.println("Error requesting chunk: " + e.getMessage());
                     break;
@@ -445,6 +445,7 @@ public class PeerConnection {
             }
         }).start();
     }
+
 
     
     private void reassembleFile(String filePath) {
