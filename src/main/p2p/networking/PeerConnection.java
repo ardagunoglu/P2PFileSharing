@@ -390,6 +390,7 @@ public class PeerConnection {
                         synchronized (matchFoundPeers) {
                             if (!matchFoundPeers.isEmpty()) {
                                 downloadFileFromPeers(filePath, new FileManager(filePath));
+                                System.out.println("filepath: " + filePath);
                             }
                         }
                     } catch (Exception e) {
