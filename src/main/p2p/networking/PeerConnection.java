@@ -354,8 +354,8 @@ public class PeerConnection {
                     return;
                 }
 
-                sendFileMatchResponse(fullPath.getAbsolutePath(), senderAddress.getHostAddress(), senderAddress, senderPort);
-                System.out.println("Selected file match found and response sent: " + fullPath.getAbsolutePath() + " | Hash: " + hash);
+                sendFileMatchResponse(selectedFilePath, senderAddress.getHostAddress(), senderAddress, senderPort);
+                System.out.println("Selected file match found and response sent: " + selectedFilePath + " | Hash: " + hash);
             }
         } else {
             System.out.println("No matching files found for hash: " + hash);
