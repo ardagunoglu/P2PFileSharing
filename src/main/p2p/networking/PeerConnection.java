@@ -34,9 +34,7 @@ public class PeerConnection {
     private final List<Map.Entry<Peer, String>> matchFoundPeers = new ArrayList<>();
     private final Map<String, Map.Entry<String, String>> nearestFile = new HashMap<>();
     private final BlockingQueue<DatagramPacket> packetQueue = new LinkedBlockingQueue<>();
-    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-    private int lastMatchCount = 0;
-    private boolean isMonitoringMatches = false;
+    private final List<ScheduledExecutorService> activeSchedulers = new ArrayList<>();
     private boolean running = true;
     private DatagramSocket socket;
     private P2PController controller;
@@ -267,39 +265,65 @@ public class PeerConnection {
 
                 System.out.println("MATCH_FOUND: File " + filePath + " available from peer " + matchingPeer.getIpAddress());
 
-                if (!isMonitoringMatches) {
-                    startMatchMonitoring();
-                }
+                startMatchMonitoringForFile(filePath);
             }
         } catch (Exception e) {
             System.err.println("Error handling MATCH_FOUND: " + e.getMessage());
         }
     }
     
-    private void startMatchMonitoring() {
-        isMonitoringMatches = true;
-        scheduler.scheduleAtFixedRate(() -> {
-            synchronized (matchFoundPeers) {
-                if (matchFoundPeers.size() > 0 && matchFoundPeers.size() == lastMatchCount) {
-                    System.out.println("All peers have sent match data. Processing can begin.");
-                    processMatchFoundPeers();
-                    stopMatchMonitoring();
-                } else {
-                    lastMatchCount = matchFoundPeers.size();
+    private void startMatchMonitoringForFile(String filePath) {
+        ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+        activeSchedulers.add(scheduler);
+
+        scheduler.scheduleAtFixedRate(new Runnable() {
+            private int lastMatchCount = 0;
+
+            @Override
+            public void run() {
+                synchronized (matchFoundPeers) {
+                    int currentMatchCount = (int) matchFoundPeers.stream()
+                            .filter(entry -> entry.getValue().equals(filePath))
+                            .count();
+
+                    if (currentMatchCount > 0 && currentMatchCount == lastMatchCount) {
+                        System.out.println("All peers have sent match data for file: " + filePath);
+                        processMatchFoundPeersForFile(filePath);
+                        scheduler.shutdown(); // Bu dosya için takip tamamlandı
+                        activeSchedulers.remove(scheduler);
+                    } else {
+                        lastMatchCount = currentMatchCount;
+                    }
                 }
             }
         }, 0, 2, TimeUnit.SECONDS);
     }
     
-    private void stopMatchMonitoring() {
-        scheduler.shutdownNow();
-        isMonitoringMatches = false;
-        lastMatchCount = 0;
+    public void shutdownAllSchedulers() {
+        synchronized (activeSchedulers) {
+            for (ScheduledExecutorService scheduler : activeSchedulers) {
+                if (!scheduler.isShutdown()) {
+                    scheduler.shutdown();
+                }
+            }
+            activeSchedulers.clear();
+        }
     }
     
-    private void processMatchFoundPeers() {
-        System.out.println("Processing matched peers: " + matchFoundPeers);
-        matchFoundPeers.clear();
+    private void processMatchFoundPeersForFile(String filePath) {
+        synchronized (matchFoundPeers) {
+            List<Map.Entry<Peer, String>> matchesForFile = new ArrayList<>();
+            matchFoundPeers.removeIf(entry -> {
+                if (entry.getValue().equals(filePath)) {
+                    matchesForFile.add(entry);
+                    return true;
+                }
+                return false;
+            });
+
+            System.out.println("Processing matched peers for file: " + filePath);
+            System.out.println("Matched peers: " + matchesForFile);
+        }
     }
     
     public List<Map.Entry<Peer, String>> getMatchFoundPeers() {
