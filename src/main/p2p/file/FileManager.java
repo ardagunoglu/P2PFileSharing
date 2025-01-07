@@ -8,6 +8,7 @@ import java.util.List;
 
 public class FileManager {
 
+    private static final int CHUNK_SIZE = 256 * 1024;
     private final List<byte[]> fileChunks;
 
     public FileManager(String filePath) throws IOException {
@@ -19,10 +20,11 @@ public class FileManager {
         File file = new File(filePath);
 
         try (FileInputStream fis = new FileInputStream(file)) {
-            byte[] buffer = new byte[256];
+            byte[] buffer = new byte[CHUNK_SIZE];
             int bytesRead;
+
             while ((bytesRead = fis.read(buffer)) != -1) {
-                if (bytesRead < 256) {
+                if (bytesRead < CHUNK_SIZE) {
                     byte[] finalChunk = new byte[bytesRead];
                     System.arraycopy(buffer, 0, finalChunk, 0, bytesRead);
                     chunks.add(finalChunk);
@@ -44,10 +46,10 @@ public class FileManager {
     public int getTotalChunks() {
         return fileChunks.size();
     }
-    
+
     public void printChunks() {
         for (int i = 0; i < fileChunks.size(); i++) {
-            System.out.println("Index " + (i + 1) + ": " + new String(fileChunks.get(i)));
+            System.out.println("Index " + (i + 1) + ": Chunk Size = " + fileChunks.get(i).length + " bytes");
         }
     }
 }
