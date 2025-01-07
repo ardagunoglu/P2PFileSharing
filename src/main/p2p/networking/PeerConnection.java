@@ -227,7 +227,7 @@ public class PeerConnection {
                 File fullPath = new File(rootPath, selectedFilePath);
 
                 try {
-                    FileManager fileManager = new FileManager(fullPath.getAbsolutePath());
+                    FileManager fileManager = new FileManager(rootPath, selectedFilePath);
                     System.out.println("File split into " + fileManager.getTotalChunks() + " chunks.");
 
                     fileManager.printChunks();
@@ -280,8 +280,9 @@ public class PeerConnection {
             if (parts.length == 2) {
                 String requestedFilePath = parts[0];
                 int chunkIndex = Integer.parseInt(parts[1]);
+                String rootPath = model.getSharedFolderPath();
 
-                FileManager fileManager = new FileManager(requestedFilePath);
+                FileManager fileManager = new FileManager(rootPath, requestedFilePath);;
                 if (chunkIndex < fileManager.getTotalChunks()) {
                     byte[] chunk = fileManager.getChunk(chunkIndex);
 
@@ -355,7 +356,7 @@ public class PeerConnection {
             int totalChunks = 0;
 
             try {
-                FileManager fileManager = new FileManager(filePath);
+                FileManager fileManager = new FileManager(model.getSharedFolderPath(), filePath);
                 totalChunks = fileManager.getTotalChunks();
                 System.out.println("Total chunks to download: " + totalChunks);
             } catch (IOException e) {
