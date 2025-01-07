@@ -377,10 +377,10 @@ public class PeerConnection {
             int chunkIndex = 0;
             int totalChunks = Integer.MAX_VALUE;
             Map<Integer, byte[]> receivedChunks = new HashMap<>();
+            final int timeout = 5000;
 
             while (chunkIndex < totalChunks) {
                 try {
-                    // Send REQUEST_CHUNK
                     String requestMessage = "REQUEST_CHUNK:" + filePath + "|" + chunkIndex;
                     DatagramPacket requestPacket = new DatagramPacket(
                             requestMessage.getBytes(),
@@ -392,10 +392,13 @@ public class PeerConnection {
                     socket.send(requestPacket);
                     System.out.println("Sent REQUEST_CHUNK to peer: " + peer.getIpAddress() + " for chunk index: " + chunkIndex);
 
-                    // Receive RESPONSE_CHUNK
-                    DatagramPacket responsePacket = receiveResponse();
-                    String responseData = new String(responsePacket.getData(), 0, responsePacket.getLength());
+                    DatagramPacket responsePacket = receiveResponseWithTimeout(timeout);
+                    if (responsePacket == null) {
+                        System.err.println("Timeout waiting for RESPONSE_CHUNK for chunk index: " + chunkIndex);
+                        break;
+                    }
 
+                    String responseData = new String(responsePacket.getData(), 0, responsePacket.getLength());
                     if (responseData.startsWith("RESPONSE_CHUNK:")) {
                         String[] parts = responseData.substring(15).split("\\|", 4);
                         if (parts.length == 4) {
@@ -430,6 +433,23 @@ public class PeerConnection {
                 System.err.println("Failed to receive all chunks for file: " + filePath);
             }
         }).start();
+    }
+    
+    private DatagramPacket receiveResponseWithTimeout(int timeout) {
+        try {
+            socket.setSoTimeout(timeout);
+            byte[] buffer = new byte[65536];
+            DatagramPacket responsePacket = new DatagramPacket(buffer, buffer.length);
+            socket.receive(responsePacket);
+            socket.setSoTimeout(0);
+            return responsePacket;
+        } catch (SocketTimeoutException e) {
+            System.err.println("Socket timeout while waiting for response.");
+            return null;
+        } catch (IOException e) {
+            System.err.println("Error receiving response: " + e.getMessage());
+            return null;
+        }
     }
     
     private void reassembleFile(String filePath, Map<Integer, byte[]> receivedChunks) {
