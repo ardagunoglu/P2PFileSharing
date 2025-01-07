@@ -389,8 +389,8 @@ public class PeerConnection {
                         Thread.sleep(2000);
                         synchronized (matchFoundPeers) {
                             if (!matchFoundPeers.isEmpty()) {
+                            	System.out.println("filepath: " + filePath);
                                 downloadFileFromPeers(filePath, new FileManager(filePath));
-                                System.out.println("filepath: " + filePath);
                             }
                         }
                     } catch (Exception e) {
