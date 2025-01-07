@@ -182,7 +182,7 @@ public class PeerConnection {
         } else if (receivedData.startsWith("REQUEST_CHUNK:")) {
             handleChunkRequest(receivedData, senderAddress, packet.getPort());
         } else if (receivedData.startsWith("WAIT_PEERS_F:")) {
-        	handleWaitPeersF(receivedData);
+            handleChunkRequest(receivedData, senderAddress, packet.getPort());
         } else {
             try {
 				handlePeerConnectionMessages(receivedData, packet, senderAddress);
@@ -269,44 +269,10 @@ public class PeerConnection {
 
                 System.out.println("MATCH_FOUND: File " + filePath + " available from peer " + matchingPeer.getIpAddress());
 
-                ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-                scheduler.schedule(() -> {
-                    sendWaitPeersF(filePath);
-                }, 2, TimeUnit.SECONDS);
+                startMatchMonitoringForFile(filePath);
             }
         } catch (Exception e) {
             System.err.println("Error handling MATCH_FOUND: " + e.getMessage());
-        }
-    }
-
-    private void sendWaitPeersF(String filePath) {
-        synchronized (matchFoundPeers) {
-            for (Map.Entry<Peer, String> peerEntry : matchFoundPeers) {
-                Peer peer = peerEntry.getKey();
-                try {
-                    String waitMessage = "WAIT_PEERS_F:" + filePath;
-                    DatagramPacket packet = new DatagramPacket(
-                        waitMessage.getBytes(),
-                        waitMessage.length(),
-                        InetAddress.getByName(peer.getIpAddress()),
-                        peer.getPort()
-                    );
-                    socket.send(packet);
-                    System.out.println("Sent WAIT_PEERS_F for file: " + filePath + " to " + peer.getIpAddress());
-                } catch (Exception e) {
-                    System.err.println("Error sending WAIT_PEERS_F: " + e.getMessage());
-                }
-            }
-        }
-    }
-
-    private void handleWaitPeersF(String receivedData) {
-        try {
-            String filePath = receivedData.substring(13).trim();
-            System.out.println("Received WAIT_PEERS_F for file: " + filePath);
-            processMatchFoundPeersForFile(filePath);
-        } catch (Exception e) {
-            System.err.println("Error handling WAIT_PEERS_F: " + e.getMessage());
         }
     }
     
@@ -318,14 +284,14 @@ public class PeerConnection {
                 int chunkIndex = Integer.parseInt(parts[1]);
                 String rootPath = model.getSharedFolderPath();
 
-                FileManager fileManager = new FileManager(rootPath, requestedFilePath);
+                FileManager fileManager = new FileManager(rootPath, requestedFilePath);;
                 if (chunkIndex < fileManager.getTotalChunks()) {
                     byte[] chunk = fileManager.getChunk(chunkIndex);
 
                     String responseMessage = "RESPONSE_CHUNK:" + requestedFilePath + "|" + chunkIndex + "|" + fileManager.getTotalChunks();
                     DatagramPacket responsePacket = new DatagramPacket(
-                            chunk,
-                            chunk.length,
+                            responseMessage.getBytes(),
+                            responseMessage.length(),
                             senderAddress,
                             senderPort
                     );
@@ -342,7 +308,6 @@ public class PeerConnection {
             System.err.println("Error handling chunk request: " + e.getMessage());
         }
     }
-
     
     private void startMatchMonitoringForFile(String filePath) {
         synchronized (activeSchedulers) {
@@ -449,7 +414,6 @@ public class PeerConnection {
             System.out.println("All chunks downloaded for file: " + filePath);
         }).start();
     }
-
     
     private boolean handleChunkResponse(String responseData, String filePath, int chunkIndex) {
         try {
@@ -463,9 +427,6 @@ public class PeerConnection {
                     System.out.println("Received chunk " + responseChunkIndex +
                             " for file " + responseFilePath + " (Total chunks: " + totalChunks + ")");
 
-                    // Save the chunk to the file (you need to implement a method to write the chunk)
-                    saveChunkToFile(responseFilePath, chunkIndex);
-
                     return (responseChunkIndex + 1) >= totalChunks;
                 } else {
                     System.err.println("Mismatch in response data for chunk: " + responseData);
@@ -477,10 +438,6 @@ public class PeerConnection {
             System.err.println("Error handling chunk response: " + e.getMessage());
         }
         return false;
-    }
-
-    private void saveChunkToFile(String filePath, int chunkIndex) {
-        System.out.println("Chunk " + chunkIndex + " of file " + filePath + " saved.");
     }
     
     public List<Map.Entry<Peer, String>> getMatchFoundPeers() {
