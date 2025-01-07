@@ -1,12 +1,14 @@
 package main.p2p.networking;
 
 import main.p2p.controller.P2PController;
+import main.p2p.file.FileManager;
 import main.p2p.file.FileSearchManager;
 import main.p2p.model.P2PModel;
 import main.p2p.model.Peer;
 import main.p2p.util.NetworkUtils;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.*;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -213,6 +215,17 @@ public class PeerConnection {
             if (selectedFilePath != null) {
                 synchronized (nearestFile) {
                     nearestFile.put(hash, Map.entry(selectedFilePath, foundFiles.get(selectedFilePath)));
+                }
+                
+                try {
+                    FileManager fileManager = new FileManager(selectedFilePath);
+                    System.out.println("File split into " + fileManager.getTotalChunks() + " chunks.");
+                    
+                    fileManager.printChunks();
+
+                } catch (IOException e) {
+                    System.err.println("Error splitting file into chunks: " + e.getMessage());
+                    return;
                 }
 
                 sendFileMatchResponse(selectedFilePath, senderAddress.getHostAddress(), senderAddress, senderPort);
