@@ -317,17 +317,10 @@ public class PeerConnection {
     
     private void processMatchFoundPeersForFile(String filePath) {
         synchronized (matchFoundPeers) {
-            List<Map.Entry<Peer, String>> matchesForFile = new ArrayList<>();
-            matchFoundPeers.removeIf(entry -> {
-                if (entry.getValue().equals(filePath)) {
-                    matchesForFile.add(entry);
-                    return true;
-                }
-                return false;
-            });
-
-            System.out.println("Processing matched peers for file: " + filePath);
-            System.out.println("Matched peers: " + matchesForFile);
+            System.out.println("Current matchFoundPeers for file: " + filePath);
+            for (Map.Entry<Peer, String> entry : matchFoundPeers) {
+                System.out.println("Peer: " + entry.getKey() + ", File Path: " + entry.getValue());
+            }
         }
     }
     
