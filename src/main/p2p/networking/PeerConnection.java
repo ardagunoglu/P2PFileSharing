@@ -8,9 +8,11 @@ import main.p2p.model.Peer;
 import main.p2p.util.NetworkUtils;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.*;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -251,16 +253,16 @@ public class PeerConnection {
             if (parts.length == 2) {
                 String filePath = parts[0];
                 int chunkIndex = Integer.parseInt(parts[1]);
-                
+
                 String rootPath = model.getSharedFolderPath();
                 File fullPath = new File(rootPath, filePath);
 
                 FileManager fileManager = new FileManager(fullPath.getAbsolutePath());
                 int totalChunks = fileManager.getTotalChunks();
                 byte[] chunkData = fileManager.getChunk(chunkIndex);
+                String chunkDataEncoded = Base64.getEncoder().encodeToString(chunkData);
 
-                // Send RESPONSE_CHUNK
-                String responseMessage = "RESPONSE_CHUNK:" + filePath + "|" + chunkIndex + "|" + totalChunks;
+                String responseMessage = "RESPONSE_CHUNK:" + filePath + "|" + chunkIndex + "|" + totalChunks + "|" + chunkDataEncoded;
                 DatagramPacket responsePacket = new DatagramPacket(
                         responseMessage.getBytes(),
                         responseMessage.length(),
@@ -372,9 +374,11 @@ public class PeerConnection {
         new Thread(() -> {
             int chunkIndex = 0;
             int totalChunks = Integer.MAX_VALUE;
+            Map<Integer, byte[]> receivedChunks = new HashMap<>();
 
             while (chunkIndex < totalChunks) {
                 try {
+                    // Send REQUEST_CHUNK
                     String requestMessage = "REQUEST_CHUNK:" + filePath + "|" + chunkIndex;
                     DatagramPacket requestPacket = new DatagramPacket(
                             requestMessage.getBytes(),
@@ -386,17 +390,20 @@ public class PeerConnection {
                     socket.send(requestPacket);
                     System.out.println("Sent REQUEST_CHUNK to peer: " + peer.getIpAddress() + " for chunk index: " + chunkIndex);
 
+                    // Receive RESPONSE_CHUNK
                     DatagramPacket responsePacket = receiveResponse();
                     String responseData = new String(responsePacket.getData(), 0, responsePacket.getLength());
 
                     if (responseData.startsWith("RESPONSE_CHUNK:")) {
-                        String[] parts = responseData.substring(15).split("\\|");
-                        if (parts.length == 3) {
+                        String[] parts = responseData.substring(15).split("\\|", 4);
+                        if (parts.length == 4) {
                             String receivedFilePath = parts[0];
                             int receivedIndex = Integer.parseInt(parts[1]);
                             totalChunks = Integer.parseInt(parts[2]);
+                            byte[] chunkData = Base64.getDecoder().decode(parts[3]);
 
                             if (receivedFilePath.equals(filePath) && receivedIndex == chunkIndex) {
+                                receivedChunks.put(receivedIndex, chunkData);
                                 System.out.println("Received chunk index: " + receivedIndex + " for file: " + filePath);
                                 chunkIndex++;
                             } else {
@@ -415,8 +422,24 @@ public class PeerConnection {
                 }
             }
 
-            System.out.println("All chunks requested and received for file: " + filePath);
+            if (receivedChunks.size() == totalChunks) {
+                reassembleFile(filePath, receivedChunks);
+            } else {
+                System.err.println("Failed to receive all chunks for file: " + filePath);
+            }
         }).start();
+    }
+    
+    private void reassembleFile(String filePath, Map<Integer, byte[]> receivedChunks) {
+        String outputPath = "received_" + new File(filePath).getName();
+        try (FileOutputStream fos = new FileOutputStream(outputPath)) {
+            for (int i = 0; i < receivedChunks.size(); i++) {
+                fos.write(receivedChunks.get(i));
+            }
+            System.out.println("File reassembled successfully: " + outputPath);
+        } catch (IOException e) {
+            System.err.println("Error reassembling file: " + e.getMessage());
+        }
     }
     
     private DatagramPacket receiveResponse() throws IOException {
