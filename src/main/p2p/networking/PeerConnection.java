@@ -183,6 +183,8 @@ public class PeerConnection {
             handleMatchFound(receivedData, senderAddress);
         } else if(receivedData.startsWith("REQUEST_CHUNK:")) {
             handleChunkRequest(receivedData.substring(14), senderAddress, packet.getPort());
+        } else if(receivedData.startsWith("RESPONSE_CHUNK:")) {
+        	
         } else {
             try {
 				handlePeerConnectionMessages(receivedData, packet, senderAddress);
