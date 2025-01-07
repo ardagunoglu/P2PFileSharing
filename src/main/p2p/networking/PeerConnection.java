@@ -247,28 +247,22 @@ public class PeerConnection {
         }
     }
 
-    private void sendWaitPeersF(String filePath) {
-        synchronized (matchFoundPeers) {
-            for (Map.Entry<Peer, String> peerEntry : matchFoundPeers) {
-                Peer peer = peerEntry.getKey();
-                try {
-                    String waitMessage = "WAIT_PEERS_F:" + filePath;
-                    DatagramPacket packet = new DatagramPacket(
-                        waitMessage.getBytes(),
-                        waitMessage.length(),
-                        InetAddress.getByName(peer.getIpAddress()),
-                        peer.getPort()
-                    );
-                    socket.send(packet);
-                    System.out.println("Sent WAIT_PEERS_F for file: " + filePath + " to " + peer.getIpAddress());
-                } catch (Exception e) {
-                    System.err.println("Error sending WAIT_PEERS_F: " + e.getMessage());
-                }
-            }
+    private void sendWaitPeersF(String filePath, InetAddress requesterAddress) {
+        try {
+            String waitMessage = "WAIT_PEERS_F:" + filePath;
+            DatagramPacket packet = new DatagramPacket(
+                waitMessage.getBytes(),
+                waitMessage.length(),
+                requesterAddress,
+                CONNECTION_PORT
+            );
+            socket.send(packet);
+            System.out.println("Sent WAIT_PEERS_F for file: " + filePath + " to requester: " + requesterAddress);
+        } catch (Exception e) {
+            System.err.println("Error sending WAIT_PEERS_F: " + e.getMessage());
         }
     }
 
-    
     private int calculatePathDepth(String filePath) {
         String normalizedPath = filePath.replaceAll("^/|/$", "");
 
@@ -290,7 +284,8 @@ public class PeerConnection {
 
                 System.out.println("MATCH_FOUND: File " + filePath + " available from peer " + matchingPeer.getIpAddress());
 
-                startMatchMonitoringForFile(filePath);
+                ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+                scheduler.schedule(() -> sendWaitPeersF(filePath, senderAddress), 2, TimeUnit.SECONDS);
             }
         } catch (Exception e) {
             System.err.println("Error handling MATCH_FOUND: " + e.getMessage());
@@ -305,16 +300,16 @@ public class PeerConnection {
                 int chunkIndex = Integer.parseInt(parts[1]);
                 String rootPath = model.getSharedFolderPath();
 
-                FileManager fileManager = new FileManager(rootPath, requestedFilePath);;
+                FileManager fileManager = new FileManager(rootPath, requestedFilePath);
                 if (chunkIndex < fileManager.getTotalChunks()) {
                     byte[] chunk = fileManager.getChunk(chunkIndex);
 
                     String responseMessage = "RESPONSE_CHUNK:" + requestedFilePath + "|" + chunkIndex + "|" + fileManager.getTotalChunks();
                     DatagramPacket responsePacket = new DatagramPacket(
-                            responseMessage.getBytes(),
-                            responseMessage.length(),
-                            senderAddress,
-                            senderPort
+                        chunk,
+                        chunk.length,
+                        senderAddress,
+                        senderPort
                     );
 
                     socket.send(responsePacket);
@@ -375,8 +370,9 @@ public class PeerConnection {
     
     private void handleWaitPeersF(String receivedData) {
         try {
-            String filePath = receivedData.substring(13).trim(); // Extract file path
+            String filePath = receivedData.substring(13).trim();
             System.out.println("Received WAIT_PEERS_F for file: " + filePath);
+
             processMatchFoundPeersForFile(filePath);
         } catch (Exception e) {
             System.err.println("Error handling WAIT_PEERS_F: " + e.getMessage());
@@ -387,8 +383,8 @@ public class PeerConnection {
     private void processMatchFoundPeersForFile(String filePath) {
         synchronized (matchFoundPeers) {
             System.out.println("Starting round-robin chunk request process for file: " + filePath);
-            int totalChunks = 0;
 
+            int totalChunks = 0;
             try {
                 FileManager fileManager = new FileManager(model.getSharedFolderPath(), filePath);
                 totalChunks = fileManager.getTotalChunks();
